@@ -160,6 +160,14 @@ function App(): React.JSX.Element {
                   <button
                     className={`tag ${selected === p.target ? 'tag-active' : ''} ${p.status !== 'idle' ? 'tag-dim' : ''}`}
                     onClick={() => setSelected(p.target)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Tab' && !e.shiftKey && p.choices.length > 0) {
+                        e.preventDefault()
+                        const row = e.currentTarget.closest('.tag-row')
+                        const firstChoice = row?.querySelector<HTMLButtonElement>('.choice-num')
+                        firstChoice?.focus()
+                      }
+                    }}
                   >
                     <span className={`dot dot-${p.status}`} />
                     {p.target.split(':')[1]}
@@ -170,7 +178,31 @@ function App(): React.JSX.Element {
                         <button
                           key={c.number}
                           className="choice-num"
+                          tabIndex={-1}
                           title={c.label}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Tab' && !e.shiftKey) {
+                              e.preventDefault()
+                              const next = e.currentTarget.nextElementSibling as HTMLButtonElement | null
+                              if (next) {
+                                next.focus()
+                              } else {
+                                // Last choice → move focus to textarea
+                                const ta = document.querySelector<HTMLTextAreaElement>('.textarea')
+                                ta?.focus()
+                              }
+                            }
+                            if (e.key === 'Tab' && e.shiftKey) {
+                              e.preventDefault()
+                              const prev = e.currentTarget.previousElementSibling as HTMLButtonElement | null
+                              if (prev) {
+                                prev.focus()
+                              } else {
+                                const tag = e.currentTarget.closest('.tag-row')?.querySelector<HTMLButtonElement>('.tag')
+                                tag?.focus()
+                              }
+                            }
+                          }}
                           onClick={async () => {
                             await window.api.sendInput(p.target, c.number)
                             setStatus({ message: `Sent ${c.number} → ${p.target}`, ok: true })
@@ -210,6 +242,15 @@ function App(): React.JSX.Element {
                           ok: true
                         })
                         setTimeout(() => setStatus(null), 2000)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab' && !e.shiftKey) {
+                          const next = e.currentTarget.nextElementSibling as HTMLButtonElement | null
+                          if (!next) {
+                            e.preventDefault()
+                            document.querySelector<HTMLTextAreaElement>('.textarea')?.focus()
+                          }
+                        }
                       }}
                     >
                       {c.number}. {c.label}

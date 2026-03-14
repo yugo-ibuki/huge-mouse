@@ -245,11 +245,13 @@
   padding: 0;
 }
 
-.choice-num:hover {
+.choice-num:hover,
+.choice-num:focus {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
   box-shadow: 0 0 8px var(--accent-glow);
+  outline: none;
 }
 
 .no-sessions {
@@ -319,11 +321,13 @@
   text-overflow: ellipsis;
 }
 
-.prompt-choice-btn:hover {
+.prompt-choice-btn:hover,
+.prompt-choice-btn:focus {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
   box-shadow: 0 0 10px var(--accent-glow);
+  outline: none;
 }
 
 /* ── Textarea ── */
