@@ -27,6 +27,9 @@ function App(): React.JSX.Element {
     return (localStorage.getItem('theme') as 'dark' | 'light') ?? 'dark'
   })
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [history, setHistory] = useState<string[]>([])
+  const historyIndex = useRef(-1)
+  const savedDraft = useRef('')
 
   useEffect(() => {
     window.api.getAlwaysOnTop().then(setAlwaysOnTop)
@@ -54,8 +57,12 @@ function App(): React.JSX.Element {
   const send = useCallback(async () => {
     if (!selected || !text.trim()) return
 
-    const result = await window.api.sendInput(selected, text)
+    const sent = text
+    const result = await window.api.sendInput(selected, sent)
     if (result.success) {
+      setHistory((prev) => [...prev, sent])
+      historyIndex.current = -1
+      savedDraft.current = ''
       setText('')
       setStatus({ message: 'Sent!', ok: true })
     } else {
@@ -91,9 +98,39 @@ function App(): React.JSX.Element {
       if (e.key === 'Enter' && e.metaKey) {
         e.preventDefault()
         send()
+        return
+      }
+      if (e.key === 'ArrowUp' && !e.metaKey && history.length > 0) {
+        const ta = e.currentTarget as HTMLTextAreaElement
+        const isAtTop = !ta.value.includes('\n') || ta.selectionStart === 0
+        if (isAtTop) {
+          e.preventDefault()
+          if (historyIndex.current === -1) {
+            savedDraft.current = text
+            historyIndex.current = history.length - 1
+          } else if (historyIndex.current > 0) {
+            historyIndex.current -= 1
+          }
+          setText(history[historyIndex.current])
+        }
+      }
+      if (e.key === 'ArrowDown' && !e.metaKey && historyIndex.current >= 0) {
+        const ta = e.currentTarget as HTMLTextAreaElement
+        const isAtBottom =
+          !ta.value.includes('\n') || ta.selectionStart === ta.value.length
+        if (isAtBottom) {
+          e.preventDefault()
+          if (historyIndex.current < history.length - 1) {
+            historyIndex.current += 1
+            setText(history[historyIndex.current])
+          } else {
+            historyIndex.current = -1
+            setText(savedDraft.current)
+          }
+        }
       }
     },
-    [send]
+    [send, history, text]
   )
 
   const toggleAlwaysOnTop = async (): Promise<void> => {
