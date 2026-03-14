@@ -1,0 +1,69 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  height: 100vh;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.select {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  background: #fff;
+}
+
+.textarea {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  resize: none;
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: #0071e3;
+  box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.2);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.send-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #0071e3;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.send-btn:hover {
+  background: #005bb5;
+}
+
+.send-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.status-ok {
+  color: #34c759;
+  font-size: 12px;
+}
+
+.status-err {
+  color: #ff3b30;
+  font-size: 12px;
+}
