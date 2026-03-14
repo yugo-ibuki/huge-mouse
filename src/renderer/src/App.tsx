@@ -101,33 +101,44 @@ function App(): React.JSX.Element {
       <div className="header">
         <div className="tags">
           {panes.length === 0 && <span className="no-sessions">No sessions found</span>}
-          {panes.map((p) => (
-            <div key={p.target} className="tag-row">
-              <button
-                className={`tag ${selected === p.target ? 'tag-active' : ''} ${p.status !== 'idle' ? 'tag-dim' : ''}`}
-                onClick={() => setSelected(p.target)}
-              >
-                <span className={`dot dot-${p.status}`} />
-                {p.target}
-              </button>
-              {p.choices.length > 0 && (
-                <div className="inline-choices">
-                  {p.choices.map((c) => (
-                    <button
-                      key={c.number}
-                      className="choice-num"
-                      title={c.label}
-                      onClick={async () => {
-                        await window.api.sendInput(p.target, c.number)
-                        setStatus({ message: `Sent ${c.number} → ${p.target}`, ok: true })
-                        setTimeout(() => setStatus(null), 2000)
-                      }}
-                    >
-                      {c.number}
-                    </button>
-                  ))}
+          {Object.entries(
+            panes.reduce<Record<string, TmuxPane[]>>((groups, p) => {
+              const session = p.target.split(':')[0]
+              ;(groups[session] ??= []).push(p)
+              return groups
+            }, {})
+          ).map(([session, group]) => (
+            <div key={session} className="session-group">
+              <span className="session-label">{session}</span>
+              {group.map((p) => (
+                <div key={p.target} className="tag-row">
+                  <button
+                    className={`tag ${selected === p.target ? 'tag-active' : ''} ${p.status !== 'idle' ? 'tag-dim' : ''}`}
+                    onClick={() => setSelected(p.target)}
+                  >
+                    <span className={`dot dot-${p.status}`} />
+                    {p.target.split(':')[1]}
+                  </button>
+                  {p.choices.length > 0 && (
+                    <div className="inline-choices">
+                      {p.choices.map((c) => (
+                        <button
+                          key={c.number}
+                          className="choice-num"
+                          title={c.label}
+                          onClick={async () => {
+                            await window.api.sendInput(p.target, c.number)
+                            setStatus({ message: `Sent ${c.number} → ${p.target}`, ok: true })
+                            setTimeout(() => setStatus(null), 2000)
+                          }}
+                        >
+                          {c.number}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
           ))}
         </div>
