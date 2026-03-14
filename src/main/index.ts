@@ -44,6 +44,17 @@ app.whenReady().then(() => {
     return sendInput(target, text)
   })
 
+  ipcMain.handle('window:set-always-on-top', (_event, value: boolean) => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (win) win.setAlwaysOnTop(value)
+    return value
+  })
+
+  ipcMain.handle('window:get-always-on-top', () => {
+    const win = BrowserWindow.getFocusedWindow()
+    return win?.isAlwaysOnTop() ?? true
+  })
+
   createWindow()
 
   app.on('activate', () => {

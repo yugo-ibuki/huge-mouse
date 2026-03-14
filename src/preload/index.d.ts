@@ -1,10 +1,18 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
+interface TmuxChoice {
+  number: string
+  label: string
+}
+
 interface TmuxPane {
   target: string
   pid: string
   command: string
   title: string
+  status: 'idle' | 'busy' | 'waiting'
+  choices: TmuxChoice[]
+  prompt: string
 }
 
 interface SendResult {
@@ -15,6 +23,8 @@ interface SendResult {
 interface TmuxAPI {
   listSessions: () => Promise<TmuxPane[]>
   sendInput: (target: string, text: string) => Promise<SendResult>
+  setAlwaysOnTop: (value: boolean) => Promise<boolean>
+  getAlwaysOnTop: () => Promise<boolean>
 }
 
 declare global {

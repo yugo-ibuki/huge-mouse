@@ -15,7 +15,10 @@ export interface SendResult {
 const api = {
   listSessions: (): Promise<TmuxPane[]> => ipcRenderer.invoke('tmux:list-sessions'),
   sendInput: (target: string, text: string): Promise<SendResult> =>
-    ipcRenderer.invoke('tmux:send-input', { target, text })
+    ipcRenderer.invoke('tmux:send-input', { target, text }),
+  setAlwaysOnTop: (value: boolean): Promise<boolean> =>
+    ipcRenderer.invoke('window:set-always-on-top', value),
+  getAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:get-always-on-top')
 }
 
 if (process.contextIsolated) {
