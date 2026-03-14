@@ -45,10 +45,16 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Cmd+Enter` | Send input |
 | `Cmd+↑` | Switch to previous pane |
 | `Cmd+↓` | Switch to next pane |
+| `Ctrl+1-9` | Send numbered choice directly (modifier key configurable) |
+| `↑` / `↓` | Navigate input history |
 
 ### Settings
 
-Click the gear icon to toggle **Always on Top** mode.
+Click the gear icon to access settings:
+
+- **Always on Top** — keep the window above other windows
+- **Theme** — switch between Dark and Light
+- **Choice Key** — change the modifier for quick choice shortcuts (`Ctrl` or `Cmd`)
 
 ## License
 
