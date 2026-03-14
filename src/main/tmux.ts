@@ -73,7 +73,7 @@ async function capturePaneContent(target: string): Promise<string> {
   }
 }
 
-const CHOICE_PATTERN = /^\s*[❯ ]\s*(\d+)\.\s+(.+)$/
+const CHOICE_PATTERN = /^\s*[❯›>☞ ]\s*(\d+)[.)]\s+(.+)$/
 
 function parseChoices(content: string): TmuxChoice[] {
   const lines = content.split('\n').slice(-20)
@@ -89,19 +89,21 @@ function parseChoices(content: string): TmuxChoice[] {
 
 function parsePrompt(content: string): string {
   const lines = content.split('\n')
-  // Find the prompt block between the separator line and the choices
+  // Walk backwards from end, skip choice lines and hints, collect prompt text
   const promptLines: string[] = []
-  let inPromptBlock = false
+  let pastChoices = false
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim()
-    if (CHOICE_PATTERN.test(line)) continue
-    if (/^Esc to cancel/.test(line)) continue
-    if (/^Do you want to/.test(line)) {
-      inPromptBlock = true
+    if (line === '') {
+      if (pastChoices) break
       continue
     }
-    if (inPromptBlock) {
-      if (line === '' || /^─+$/.test(line)) break
+    if (CHOICE_PATTERN.test(line) || /^Esc to cancel/.test(line)) {
+      pastChoices = true
+      continue
+    }
+    if (pastChoices) {
+      if (/^─+$/.test(line)) break
       promptLines.unshift(line)
     }
   }
@@ -110,10 +112,18 @@ function parsePrompt(content: string): string {
 
 function detectStatus(title: string, content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
   if (!title.includes('✳')) return { status: 'busy', choices: [], prompt: '' }
+
+  const choices = parseChoices(content)
+
+  // If numbered choices are detected, it's a waiting state regardless of prompt text
+  if (choices.length > 0) {
+    return { status: 'waiting', choices, prompt: parsePrompt(content) }
+  }
+
   const lines = content.split('\n').slice(-10)
   for (const pattern of WAITING_PATTERNS) {
     if (lines.some((line) => pattern.test(line))) {
-      return { status: 'waiting', choices: parseChoices(content), prompt: parsePrompt(content) }
+      return { status: 'waiting', choices: [], prompt: parsePrompt(content) }
     }
   }
   return { status: 'idle', choices: [], prompt: '' }
