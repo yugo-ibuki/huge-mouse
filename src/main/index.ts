@@ -5,8 +5,8 @@ import { listPanes, sendInput } from './tmux'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 400,
-    height: 300,
+    width: 700,
+    height: 400,
     alwaysOnTop: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
