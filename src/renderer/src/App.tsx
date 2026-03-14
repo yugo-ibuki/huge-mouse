@@ -402,12 +402,12 @@ function App(): React.JSX.Element {
           />
 
           <div className="footer">
-            <button className="send-btn" onClick={send} disabled={!selected || !text.trim()}>
-              Send
-            </button>
             {status && (
               <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>
             )}
+            <button className="send-btn" onClick={send} disabled={!selected || !text.trim()}>
+              Send
+            </button>
           </div>
         </div>
 
