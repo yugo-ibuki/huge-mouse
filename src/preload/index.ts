@@ -7,6 +7,22 @@ export interface TmuxPane {
   title: string
 }
 
+export interface PaneDetail {
+  target: string
+  pid: string
+  command: string
+  title: string
+  width: string
+  height: string
+  startedAt: string
+  cwd: string
+  tty: string
+  gitBranch: string
+  gitStatus: string
+  model: string
+  sessionId: string
+}
+
 export interface SendResult {
   success: boolean
   error?: string
@@ -18,6 +34,8 @@ const api = {
     ipcRenderer.invoke('tmux:send-input', { target, text }),
   capturePane: (target: string): Promise<string> =>
     ipcRenderer.invoke('tmux:capture-pane', target),
+  getPaneDetail: (target: string): Promise<PaneDetail | null> =>
+    ipcRenderer.invoke('tmux:pane-detail', target),
   setAlwaysOnTop: (value: boolean): Promise<boolean> =>
     ipcRenderer.invoke('window:set-always-on-top', value),
   getAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:get-always-on-top')

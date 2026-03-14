@@ -663,6 +663,62 @@
   to { opacity: 1; }
 }
 
+.detail-popup {
+  height: auto;
+  max-height: 85%;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  font-size: 10px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.detail-label {
+  color: var(--text-dim);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  padding: 2px 0;
+}
+
+.detail-value {
+  color: var(--text);
+  font-family: var(--font-mono);
+  word-break: break-all;
+  padding: 2px 0;
+}
+
+.detail-session {
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0.3px;
+}
+
+.detail-model {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.detail-branch {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.detail-git-status {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+}
+
 @keyframes popup-in {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }

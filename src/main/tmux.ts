@@ -57,6 +57,51 @@ function run(args: string[]): Promise<string> {
   })
 }
 
+function runGit(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile('git', args, { timeout: 3000 }, (error, stdout) => {
+      if (error) return reject(error)
+      resolve(stdout)
+    })
+  })
+}
+
+const MODEL_PATTERNS = [
+  /claude-opus[^\s]*/i,
+  /claude-sonnet[^\s]*/i,
+  /claude-haiku[^\s]*/i,
+  /claude-\d[^\s]*/i,
+  /\b(opus|sonnet|haiku)\s+[\d.]+/i,
+  /model:\s*([^\s,]+)/i,
+  /\bgpt-[^\s]*/i,
+  /\bo[13]-[^\s]*/i,
+  /\bcodex-[^\s]*/i
+]
+
+function parseModel(content: string): string {
+  const lines = content.split('\n')
+  for (const line of lines) {
+    for (const pattern of MODEL_PATTERNS) {
+      const match = line.match(pattern)
+      if (match) return match[0].trim()
+    }
+  }
+  return ''
+}
+
+function parseSessionId(content: string): string {
+  const lines = content.split('\n')
+  for (const line of lines) {
+    // "session: abc123..." or "Session ID: abc123..."
+    const idMatch = line.match(/[Ss]ession(?:\s*ID)?[:\s]+([a-f0-9-]{8,})/)
+    if (idMatch) return idMatch[1]
+    // standalone UUID pattern near "session" context
+    const uuidMatch = line.match(/\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b/)
+    if (uuidMatch) return uuidMatch[1]
+  }
+  return ''
+}
+
 const WAITING_PATTERNS = [
   /Yes\s*\/\s*No/,
   /\(y\/n\)/i,
@@ -174,6 +219,69 @@ export async function sendInput(
     return { success: true }
   } catch (e) {
     return { success: false, error: String(e) }
+  }
+}
+
+export interface PaneDetail {
+  target: string
+  pid: string
+  command: string
+  title: string
+  width: string
+  height: string
+  startedAt: string
+  cwd: string
+  tty: string
+  gitBranch: string
+  gitStatus: string
+  model: string
+  sessionId: string
+}
+
+export async function getPaneDetail(target: string): Promise<PaneDetail | null> {
+  if (!TARGET_PATTERN.test(target)) return null
+  try {
+    const format = [
+      '#{session_name}:#{window_index}.#{pane_index}',
+      '#{pane_pid}',
+      '#{pane_current_command}',
+      '#{pane_title}',
+      '#{pane_width}',
+      '#{pane_height}',
+      '#{pane_start_command}',
+      '#{pane_current_path}',
+      '#{pane_tty}'
+    ].join('|')
+    const stdout = await run(['display-message', '-t', target, '-p', format])
+    const parts = stdout.trim().split('|')
+    const cwd = parts[7]
+
+    const [gitBranch, gitStatus, content] = await Promise.all([
+      runGit(['-C', cwd, 'branch', '--show-current']).catch(() => ''),
+      runGit(['-C', cwd, 'status', '--short']).catch(() => ''),
+      capturePaneContent(target)
+    ])
+
+    const model = parseModel(content)
+    const sessionId = parseSessionId(content)
+
+    return {
+      target: parts[0],
+      pid: parts[1],
+      command: parts[2],
+      title: parts[3],
+      width: parts[4],
+      height: parts[5],
+      startedAt: parts[6],
+      cwd,
+      tty: parts[8],
+      gitBranch: gitBranch.trim(),
+      gitStatus: gitStatus.trim(),
+      model,
+      sessionId
+    }
+  } catch {
+    return null
   }
 }
 

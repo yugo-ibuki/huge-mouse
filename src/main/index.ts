@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { listPanes, sendInput, capturePane } from './tmux'
+import { listPanes, sendInput, capturePane, getPaneDetail } from './tmux'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -46,6 +46,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tmux:capture-pane', async (_event, target: string) => {
     return capturePane(target)
+  })
+
+  ipcMain.handle('tmux:pane-detail', async (_event, target: string) => {
+    return getPaneDetail(target)
   })
 
   ipcMain.handle('window:set-always-on-top', (_event, value: boolean) => {

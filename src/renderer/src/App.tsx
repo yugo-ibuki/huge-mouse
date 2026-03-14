@@ -6,6 +6,22 @@ interface TmuxChoice {
   label: string
 }
 
+interface PaneDetail {
+  target: string
+  pid: string
+  command: string
+  title: string
+  width: string
+  height: string
+  startedAt: string
+  cwd: string
+  tty: string
+  gitBranch: string
+  gitStatus: string
+  model: string
+  sessionId: string
+}
+
 interface TmuxPane {
   target: string
   pid: string
@@ -34,6 +50,8 @@ function App(): React.JSX.Element {
   })
   const [editingPreviewKey, setEditingPreviewKey] = useState(false)
   const [paneContent, setPaneContent] = useState<string | null>(null)
+  const [paneDetail, setPaneDetail] = useState<PaneDetail | null>(null)
+  const detailContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const paneViewerRef = useRef<HTMLPreElement>(null)
   const [history, setHistory] = useState<string[]>([])
@@ -139,15 +157,32 @@ function App(): React.JSX.Element {
         }
       }
 
-      // Escape → close popup
-      if (e.key === 'Escape' && paneContent !== null) {
+      // Ctrl+D → show session detail popup
+      if (e.ctrlKey && e.key === 'd' && !e.metaKey) {
         e.preventDefault()
-        setPaneContent(null)
+        if (selected) {
+          window.api.getPaneDetail(selected).then((detail) => {
+            setPaneDetail(detail)
+          })
+        }
+      }
+
+      // Escape → close popups and refocus textarea
+      if (e.key === 'Escape') {
+        if (paneContent !== null) {
+          e.preventDefault()
+          setPaneContent(null)
+          requestAnimationFrame(() => textareaRef.current?.focus())
+        } else if (paneDetail !== null) {
+          e.preventDefault()
+          setPaneDetail(null)
+          requestAnimationFrame(() => textareaRef.current?.focus())
+        }
       }
     }
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [selected, panes, choiceModifier, previewKey, paneContent])
+  }, [selected, panes, choiceModifier, previewKey, paneContent, paneDetail])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -422,7 +457,7 @@ function App(): React.JSX.Element {
           className="pane-overlay"
           tabIndex={-1}
           ref={(el) => el?.focus()}
-          onClick={() => setPaneContent(null)}
+          onClick={() => { setPaneContent(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}
           onKeyDown={(e) => {
             const el = paneViewerRef.current
             if (!el) return
@@ -450,6 +485,7 @@ function App(): React.JSX.Element {
               case 'Escape':
               case 'q':
                 setPaneContent(null)
+                requestAnimationFrame(() => textareaRef.current?.focus())
                 break
               default:
                 return
@@ -461,13 +497,102 @@ function App(): React.JSX.Element {
             <div className="pane-popup-header">
               <span className="pane-popup-title">{selected}</span>
               <span className="pane-popup-hint">j/k d/u g/G q</span>
-              <button className="pane-popup-close" onClick={() => setPaneContent(null)}>
+              <button className="pane-popup-close" onClick={() => { setPaneContent(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
                 Esc
               </button>
             </div>
             <pre ref={paneViewerRef} className="pane-popup-content">
               {paneContent}
             </pre>
+          </div>
+        </div>
+      )}
+
+      {paneDetail !== null && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => el?.focus()}
+          onClick={() => { setPaneDetail(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}
+          onKeyDown={(e) => {
+            const el = detailContentRef.current
+            if (!el) return
+            const line = 16
+            const half = el.clientHeight / 2
+            switch (e.key) {
+              case 'j':
+                el.scrollBy(0, line)
+                break
+              case 'k':
+                el.scrollBy(0, -line)
+                break
+              case 'd':
+                el.scrollBy(0, half)
+                break
+              case 'u':
+                el.scrollBy(0, -half)
+                break
+              case 'g':
+                el.scrollTo(0, 0)
+                break
+              case 'G':
+                el.scrollTo(0, el.scrollHeight)
+                break
+              case 'Escape':
+              case 'q':
+                setPaneDetail(null)
+                requestAnimationFrame(() => textareaRef.current?.focus())
+                break
+              default:
+                return
+            }
+            e.preventDefault()
+          }}
+        >
+          <div className="pane-popup detail-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">Session Detail</span>
+              <span className="pane-popup-hint">j/k d/u g/G q</span>
+              <button className="pane-popup-close" onClick={() => { setPaneDetail(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
+                Esc
+              </button>
+            </div>
+            <div ref={detailContentRef} className="detail-grid">
+              <span className="detail-label">Target</span>
+              <span className="detail-value">{paneDetail.target}</span>
+              <span className="detail-label">Command</span>
+              <span className="detail-value">{paneDetail.command}</span>
+              {paneDetail.model && (
+                <>
+                  <span className="detail-label">Model</span>
+                  <span className="detail-value detail-model">{paneDetail.model}</span>
+                </>
+              )}
+              {paneDetail.sessionId && (
+                <>
+                  <span className="detail-label">Session</span>
+                  <span className="detail-value detail-session">{paneDetail.sessionId}</span>
+                </>
+              )}
+              <span className="detail-label">PID</span>
+              <span className="detail-value">{paneDetail.pid}</span>
+              <span className="detail-label">Title</span>
+              <span className="detail-value">{paneDetail.title}</span>
+              <span className="detail-label">CWD</span>
+              <span className="detail-value">{paneDetail.cwd}</span>
+              {paneDetail.gitBranch && (
+                <>
+                  <span className="detail-label">Branch</span>
+                  <span className="detail-value detail-branch">{paneDetail.gitBranch}</span>
+                </>
+              )}
+              {paneDetail.gitStatus && (
+                <>
+                  <span className="detail-label">Git Status</span>
+                  <pre className="detail-value detail-git-status">{paneDetail.gitStatus}</pre>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
