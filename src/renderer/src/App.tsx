@@ -49,7 +49,7 @@ function App(): React.JSX.Element {
     return (localStorage.getItem('choiceModifier') as 'ctrl' | 'cmd') ?? 'ctrl'
   })
   const [previewKey, setPreviewKey] = useState(() => {
-    return localStorage.getItem('previewKey') ?? 'l'
+    return localStorage.getItem('previewKey') ?? 'p'
   })
   const [detailKey, setDetailKey] = useState(() => {
     return localStorage.getItem('detailKey') ?? 'd'
@@ -148,7 +148,9 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
-      if (e.metaKey && e.key === 'ArrowUp') {
+      const isPrevPane = (e.metaKey && e.key === 'ArrowUp') || (e.ctrlKey && e.key === 'h' && !e.metaKey)
+      const isNextPane = (e.metaKey && e.key === 'ArrowDown') || (e.ctrlKey && e.key === 'l' && !e.metaKey)
+      if (isPrevPane) {
         e.preventDefault()
         setPanes((prev) => {
           const idx = prev.findIndex((p) => p.target === selected)
@@ -156,7 +158,7 @@ function App(): React.JSX.Element {
           setSelected(prev[next].target)
           return prev
         })
-      } else if (e.metaKey && e.key === 'ArrowDown') {
+      } else if (isNextPane) {
         e.preventDefault()
         setPanes((prev) => {
           const idx = prev.findIndex((p) => p.target === selected)

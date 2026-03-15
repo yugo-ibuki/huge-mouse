@@ -81,7 +81,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 38px 10px 7px 10px;
+  padding: 32px 6px 5px 6px;
   border-bottom: none;
   flex-shrink: 0;
   background: var(--bg);
@@ -420,13 +420,13 @@
   border-left: 1px solid var(--border-subtle);
   flex-shrink: 0;
   overflow: hidden;
-  overflow-y: auto;
   transition: width 0.25s ease, padding 0.25s ease;
 }
 
 .sidebar-open {
   width: 150px;
   padding: 10px 12px;
+  overflow-y: auto;
 }
 
 .sidebar-title {
