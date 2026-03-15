@@ -169,11 +169,15 @@ function App(): React.JSX.Element {
       }
 
       // Modifier+Number → send choice directly to selected pane
+      // Use e.code (Digit1-Digit9) instead of e.key because Ctrl+2 etc.
+      // produces control characters (NUL) in Chromium, not the digit string.
       const modPressed = choiceModifier === 'cmd' ? e.metaKey : e.ctrlKey
-      if (modPressed && /^[1-9]$/.test(e.key)) {
+      const digitMatch = e.code.match(/^Digit([1-9])$/)
+      if (modPressed && digitMatch) {
+        const digitStr = digitMatch[1]
         const pane = panes.find((p) => p.target === selected)
         if (pane && pane.choices.length > 0) {
-          const choice = pane.choices.find((c) => c.number === e.key)
+          const choice = pane.choices.find((c) => c.number === digitStr)
           if (choice) {
             e.preventDefault()
             window.api.sendInput(pane.target, choice.number).then((result) => {

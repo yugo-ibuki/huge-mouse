@@ -120,17 +120,34 @@ async function capturePaneContent(target: string): Promise<string> {
   }
 }
 
-// Match only lines with special prompt markers (❯›>☞) followed by numbered choices.
-// Space is intentionally excluded to avoid false positives on regular numbered lists.
-const CHOICE_PATTERN = /^\s*[❯›>☞]\s*(\d+)[.)]\s+(.+)$/
+// First choice line has a prompt marker (❯›>☞), e.g. " ❯ 1. Yes"
+// Subsequent choices have only spaces before the number, e.g. "  2. No"
+// We detect the marker line first, then collect following numbered lines as part of the same choice group.
+const MARKER_CHOICE_PATTERN = /^\s*[❯›>☞]\s*(\d+)[.)]\s+(.+)$/
+const PLAIN_CHOICE_PATTERN = /^\s+(\d+)[.)]\s+(.+)$/
 
 function parseChoices(content: string): TmuxChoice[] {
   const lines = content.split('\n').slice(-20)
   const choices: TmuxChoice[] = []
+  let inChoiceBlock = false
   for (const line of lines) {
-    const match = line.match(CHOICE_PATTERN)
-    if (match) {
-      choices.push({ number: match[1], label: match[2].trim() })
+    const markerMatch = line.match(MARKER_CHOICE_PATTERN)
+    if (markerMatch) {
+      inChoiceBlock = true
+      choices.push({ number: markerMatch[1], label: markerMatch[2].trim() })
+      continue
+    }
+    if (inChoiceBlock) {
+      const plainMatch = line.match(PLAIN_CHOICE_PATTERN)
+      if (plainMatch) {
+        choices.push({ number: plainMatch[1], label: plainMatch[2].trim() })
+      } else if (line.trim() === '' || /^\s+\S/.test(line)) {
+        // Allow blank lines and continuation lines (multi-line labels) within choice block
+        continue
+      } else {
+        // Non-matching line ends the choice block
+        inChoiceBlock = false
+      }
     }
   }
   return choices
@@ -147,7 +164,7 @@ function parsePrompt(content: string): string {
       if (pastChoices) break
       continue
     }
-    if (CHOICE_PATTERN.test(line) || /^Esc to cancel/.test(line)) {
+    if (MARKER_CHOICE_PATTERN.test(line) || PLAIN_CHOICE_PATTERN.test(line) || /^Esc to cancel/.test(line)) {
       pastChoices = true
       continue
     }
