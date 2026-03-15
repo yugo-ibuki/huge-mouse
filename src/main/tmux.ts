@@ -214,6 +214,10 @@ export async function sendInput(
   }
 
   try {
+    // Send 'i' to ensure target is in insert mode
+    await run(['send-keys', '-t', target, 'i'])
+    await new Promise((r) => setTimeout(r, 100))
+
     const hasNewlines = text.includes('\n')
     if (hasNewlines) {
       // Send bracketed paste escape sequences to preserve newlines
