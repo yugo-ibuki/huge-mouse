@@ -74,7 +74,7 @@ Press `Ctrl+D` to view details of the selected pane: target, command, model, ses
 
 ### Git operations
 
-Press `Ctrl+G` to open git operations for the selected pane's working directory. You can **Add All**, **Commit** (with a message), and **Push** directly from the popup.
+Press `Ctrl+G` to open git operations for the selected pane's working directory. You can **Add All**, **Commit** (with a message), and **Push** directly from the popup. Shortcuts within the popup: `Ctrl+A` (add all), `Ctrl+P` (push).
 
 ### Settings
 

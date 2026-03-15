@@ -74,7 +74,7 @@ brew install --cask yugo-ibuki/tap/huge-mouse
 
 ### git操作
 
-`Ctrl+G` でペインの作業ディレクトリのgit操作ポップアップを表示。**Add All**、**Commit**（メッセージ入力）、**Push** を直接実行できます。
+`Ctrl+G` でペインの作業ディレクトリのgit操作ポップアップを表示。**Add All**、**Commit**（メッセージ入力）、**Push** を直接実行できます。ポップアップ内ショートカット：`Ctrl+A`（add all）、`Ctrl+P`（push）。
 
 ### 設定
 

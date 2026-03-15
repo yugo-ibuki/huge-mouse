@@ -729,11 +729,28 @@ function App(): React.JSX.Element {
               requestAnimationFrame(() => textareaRef.current?.focus())
               e.preventDefault()
             }
+            if (e.ctrlKey && e.key === 'a') {
+              e.preventDefault()
+              window.api.gitAdd(gitPopup.cwd).then(async (r) => {
+                setGitResult(r.success ? { message: 'Staged all', ok: true } : { message: r.error ?? 'Failed', ok: false })
+                const refreshed = await window.api.getPaneDetail(gitPopup.target)
+                if (refreshed) setGitPopup(refreshed)
+                setTimeout(() => setGitResult(null), 2000)
+              })
+            }
+            if (e.ctrlKey && e.key === 'p') {
+              e.preventDefault()
+              window.api.gitPush(gitPopup.cwd).then((r) => {
+                setGitResult(r.success ? { message: 'Pushed', ok: true } : { message: r.error ?? 'Failed', ok: false })
+                setTimeout(() => setGitResult(null), 2000)
+              })
+            }
           }}
         >
           <div className="pane-popup detail-popup" onClick={(e) => e.stopPropagation()}>
             <div className="pane-popup-header">
               <span className="pane-popup-title">Git — {gitPopup.gitBranch}</span>
+              <span className="pane-popup-hint">^a add ^p push</span>
               <button className="pane-popup-close" onClick={() => { setGitPopup(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
                 Esc
               </button>
