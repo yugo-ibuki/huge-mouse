@@ -5,3 +5,7 @@ out
 .eslintcache
 *.log*
 .superpowers/
+**/.DS_Store
+web/node_modules
+web/docs/.vitepress/cache
+web/docs/.vitepress/dist
