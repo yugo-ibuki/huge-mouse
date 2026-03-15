@@ -12,7 +12,7 @@ huge-mouse は他のウィンドウの上に常駐し、tmux 内で動作中の 
 
 ## 必要なもの
 
-- macOS または Linux
+- macOS
 - [tmux](https://github.com/tmux/tmux) で `claude` または `codex` が動作していること
 
 ## インストール

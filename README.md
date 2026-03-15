@@ -12,7 +12,7 @@ It auto-discovers active AI panes, shows their status, and even lets you click n
 
 ## Requirements
 
-- macOS or Linux
+- macOS
 - [tmux](https://github.com/tmux/tmux) with at least one session running `claude` or `codex`
 
 ## Install
