@@ -64,6 +64,7 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Ctrl+D` | Open session detail popup (key configurable) |
 | `Ctrl+G` | Open git operations popup (key configurable) |
 | `↑` / `↓` | Navigate input history |
+| `Cmd+Shift+H` | Focus huge-mouse from any app (key configurable) |
 | `Escape` | Close popup / refocus textarea |
 
 Popups support vim-style navigation: `j`/`k` (scroll), `d`/`u` (half-page), `g`/`G` (top/bottom), `q` (close).
@@ -87,6 +88,7 @@ Click the gear icon to access settings:
 - **Preview Key** — change the key for pane content preview (`Ctrl+<key>`)
 - **Detail Key** — change the key for session detail popup (`Ctrl+<key>`)
 - **Git Key** — change the key for git operations popup (`Ctrl+<key>`)
+- **Focus Key** — change the global shortcut to focus huge-mouse (`Cmd+Shift+<key>`)
 
 ## License
 

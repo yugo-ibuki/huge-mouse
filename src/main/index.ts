@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush } from './tmux'
@@ -80,6 +80,28 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+
+  const registerFocusShortcut = (key: string): boolean => {
+    globalShortcut.unregisterAll()
+    const accelerator = `CommandOrControl+Shift+${key.toUpperCase()}`
+    return globalShortcut.register(accelerator, () => {
+      const win = BrowserWindow.getAllWindows()[0]
+      if (win) {
+        win.show()
+        win.focus()
+      }
+    })
+  }
+
+  ipcMain.handle('window:set-focus-shortcut', (_event, key: string) => {
+    return registerFocusShortcut(key)
+  })
+
+  ipcMain.handle('window:get-focus-shortcut', () => {
+    return true
+  })
+
+  registerFocusShortcut('h')
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

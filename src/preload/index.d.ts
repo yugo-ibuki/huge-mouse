@@ -48,6 +48,7 @@ interface TmuxAPI {
   getAlwaysOnTop: () => Promise<boolean>
   setOpacity: (value: number) => Promise<number>
   getOpacity: () => Promise<number>
+  setFocusShortcut: (key: string) => Promise<boolean>
 }
 
 declare global {

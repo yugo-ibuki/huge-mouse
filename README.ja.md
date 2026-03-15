@@ -64,6 +64,7 @@ brew install --cask yugo-ibuki/tap/huge-mouse
 | `Ctrl+D` | セッション詳細ポップアップを表示（キーは設定で変更可能） |
 | `Ctrl+G` | git操作ポップアップを表示（キーは設定で変更可能） |
 | `↑` / `↓` | 入力履歴をたどる |
+| `Cmd+Shift+H` | どのアプリからでもhuge-mouseにフォーカス（キーは設定で変更可能） |
 | `Escape` | ポップアップを閉じる / テキストエリアにフォーカス |
 
 ポップアップではvim風の操作が使えます：`j`/`k`（スクロール）、`d`/`u`（半ページ）、`g`/`G`（先頭/末尾）、`q`（閉じる）
@@ -87,6 +88,7 @@ brew install --cask yugo-ibuki/tap/huge-mouse
 - **Preview Key** — プレビュー表示のキーを変更（`Ctrl+<キー>`）
 - **Detail Key** — セッション詳細のキーを変更（`Ctrl+<キー>`）
 - **Git Key** — git操作のキーを変更（`Ctrl+<キー>`）
+- **Focus Key** — huge-mouseにフォーカスするグローバルショートカットを変更（`Cmd+Shift+<キー>`）
 
 ## ライセンス
 

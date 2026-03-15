@@ -45,7 +45,9 @@ const api = {
   getAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:get-always-on-top'),
   setOpacity: (value: number): Promise<number> =>
     ipcRenderer.invoke('window:set-opacity', value),
-  getOpacity: (): Promise<number> => ipcRenderer.invoke('window:get-opacity')
+  getOpacity: (): Promise<number> => ipcRenderer.invoke('window:get-opacity'),
+  setFocusShortcut: (key: string): Promise<boolean> =>
+    ipcRenderer.invoke('window:set-focus-shortcut', key),
 }
 
 if (process.contextIsolated) {

@@ -57,9 +57,13 @@ function App(): React.JSX.Element {
   const [gitKey, setGitKey] = useState(() => {
     return localStorage.getItem('gitKey') ?? 'g'
   })
+  const [focusKey, setFocusKey] = useState(() => {
+    return localStorage.getItem('focusKey') ?? 'h'
+  })
   const [editingPreviewKey, setEditingPreviewKey] = useState(false)
   const [editingDetailKey, setEditingDetailKey] = useState(false)
   const [editingGitKey, setEditingGitKey] = useState(false)
+  const [editingFocusKey, setEditingFocusKey] = useState(false)
   const [paneContent, setPaneContent] = useState<string | null>(null)
   const [paneDetail, setPaneDetail] = useState<PaneDetail | null>(null)
   const [commitMsg, setCommitMsg] = useState('')
@@ -75,7 +79,15 @@ function App(): React.JSX.Element {
   useEffect(() => {
     window.api.getAlwaysOnTop().then(setAlwaysOnTop)
     window.api.setOpacity(opacity)
-  }, [])
+    window.api.setFocusShortcut(focusKey)
+    const focusTextarea = (): void => {
+      if (!paneContent && !paneDetail && !gitPopup) {
+        textareaRef.current?.focus()
+      }
+    }
+    window.addEventListener('focus', focusTextarea)
+    return () => window.removeEventListener('focus', focusTextarea)
+  }, [paneContent, paneDetail, gitPopup])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -89,6 +101,11 @@ function App(): React.JSX.Element {
   useEffect(() => {
     localStorage.setItem('previewKey', previewKey)
   }, [previewKey])
+
+  useEffect(() => {
+    localStorage.setItem('focusKey', focusKey)
+    window.api.setFocusShortcut(focusKey)
+  }, [focusKey])
 
   useEffect(() => {
     localStorage.setItem('detailKey', detailKey)
@@ -135,14 +152,16 @@ function App(): React.JSX.Element {
         e.preventDefault()
         setPanes((prev) => {
           const idx = prev.findIndex((p) => p.target === selected)
-          if (idx > 0) setSelected(prev[idx - 1].target)
+          const next = idx > 0 ? idx - 1 : prev.length - 1
+          setSelected(prev[next].target)
           return prev
         })
       } else if (e.metaKey && e.key === 'ArrowDown') {
         e.preventDefault()
         setPanes((prev) => {
           const idx = prev.findIndex((p) => p.target === selected)
-          if (idx < prev.length - 1) setSelected(prev[idx + 1].target)
+          const next = idx < prev.length - 1 ? idx + 1 : 0
+          setSelected(prev[next].target)
           return prev
         })
       }
@@ -574,6 +593,32 @@ function App(): React.JSX.Element {
             ) : (
               <button className="key-display" onClick={() => setEditingGitKey(true)}>
                 Ctrl+{gitKey.toUpperCase()}
+              </button>
+            )}
+          </label>
+          <label className="setting-row">
+            <span className="setting-label">Focus Key</span>
+            {editingFocusKey ? (
+              <span
+                className="key-capture"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  e.preventDefault()
+                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+                    setFocusKey(e.key.toLowerCase())
+                    setEditingFocusKey(false)
+                  }
+                  if (e.key === 'Escape') {
+                    setEditingFocusKey(false)
+                  }
+                }}
+                ref={(el) => el?.focus()}
+              >
+                Press a key...
+              </span>
+            ) : (
+              <button className="key-display" onClick={() => setEditingFocusKey(true)}>
+                ⌘⇧{focusKey.toUpperCase()}
               </button>
             )}
           </label>

@@ -174,13 +174,15 @@
 }
 
 .tag-active {
-  background: var(--accent-muted);
-  color: var(--accent);
-  border-color: rgba(91, 141, 239, 0.25);
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .tag-active:hover {
-  background: var(--accent-glow);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .tag-dim {
