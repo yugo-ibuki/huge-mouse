@@ -216,11 +216,21 @@ export async function sendInput(
   }
 
   try {
-    // Ensure insert mode: Escape (go to normal) → i (enter insert)
-    await run(['send-keys', '-t', target, 'Escape'])
-    await new Promise((r) => setTimeout(r, 50))
-    await run(['send-keys', '-t', target, 'i'])
-    await new Promise((r) => setTimeout(r, 100))
+    // Detect if the pane is showing choices (waiting state).
+    // When choices are visible and input is a single digit (1-9),
+    // skip insert mode switch since choices work in normal mode.
+    const content = await capturePane(target)
+    const title = await run(['display-message', '-t', target, '-p', '#{pane_title}'])
+    const { status } = detectStatus(title.trim(), content)
+    const isChoiceResponse = status === 'waiting' && /^[1-9]$/.test(text)
+
+    if (!isChoiceResponse) {
+      // Ensure insert mode: Escape (go to normal) → i (enter insert)
+      await run(['send-keys', '-t', target, 'Escape'])
+      await new Promise((r) => setTimeout(r, 50))
+      await run(['send-keys', '-t', target, 'i'])
+      await new Promise((r) => setTimeout(r, 100))
+    }
 
     const hasNewlines = text.includes('\n')
     if (hasNewlines) {
