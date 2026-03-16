@@ -60,6 +60,9 @@ function App(): React.JSX.Element {
   const [focusKey, setFocusKey] = useState(() => {
     return localStorage.getItem('focusKey') ?? 'h'
   })
+  const [vimMode, setVimMode] = useState(() => {
+    return localStorage.getItem('vimMode') === 'true'
+  })
   const [editingPreviewKey, setEditingPreviewKey] = useState(false)
   const [editingDetailKey, setEditingDetailKey] = useState(false)
   const [editingGitKey, setEditingGitKey] = useState(false)
@@ -133,7 +136,7 @@ function App(): React.JSX.Element {
     if (!selected || !text.trim()) return
 
     const sent = text
-    const result = await window.api.sendInput(selected, sent)
+    const result = await window.api.sendInput(selected, sent, vimMode)
     if (result.success) {
       setHistory((prev) => [...prev, sent])
       historyIndex.current = -1
@@ -144,7 +147,7 @@ function App(): React.JSX.Element {
       setStatus({ message: result.error ?? 'Failed', ok: false })
     }
     setTimeout(() => setStatus(null), 2000)
-  }, [selected, text])
+  }, [selected, text, vimMode])
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
@@ -180,7 +183,7 @@ function App(): React.JSX.Element {
           const choice = pane.choices.find((c) => c.number === digitStr)
           if (choice) {
             e.preventDefault()
-            window.api.sendInput(pane.target, choice.number).then((result) => {
+            window.api.sendInput(pane.target, choice.number, vimMode).then((result) => {
               if (result.success) {
                 setStatus({ message: `Sent ${choice.number} → ${pane.target}`, ok: true })
               } else {
@@ -266,7 +269,7 @@ function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [selected, panes, choiceModifier, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup])
+  }, [selected, panes, choiceModifier, vimMode, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -379,7 +382,7 @@ function App(): React.JSX.Element {
                             }
                           }}
                           onClick={async () => {
-                            await window.api.sendInput(p.target, c.number)
+                            await window.api.sendInput(p.target, c.number, vimMode)
                             setStatus({ message: `Sent ${c.number} → ${p.target}`, ok: true })
                             setTimeout(() => setStatus(null), 2000)
                           }}
@@ -411,7 +414,7 @@ function App(): React.JSX.Element {
                       key={c.number}
                       className="prompt-choice-btn"
                       onClick={async () => {
-                        await window.api.sendInput(selectedPane.target, c.number)
+                        await window.api.sendInput(selectedPane.target, c.number, vimMode)
                         setStatus({
                           message: `Sent ${c.number} → ${selectedPane.target}`,
                           ok: true
@@ -524,6 +527,19 @@ function App(): React.JSX.Element {
               </button>
             </div>
           </div>
+          <label className="setting-row">
+            <span className="setting-label">Vim Mode</span>
+            <button
+              className={`toggle ${vimMode ? 'toggle-on' : ''}`}
+              onClick={() => {
+                const next = !vimMode
+                setVimMode(next)
+                localStorage.setItem('vimMode', String(next))
+              }}
+            >
+              <span className="toggle-knob" />
+            </button>
+          </label>
           <label className="setting-row">
             <span className="setting-label">Preview Key</span>
             {editingPreviewKey ? (

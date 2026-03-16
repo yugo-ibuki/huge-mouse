@@ -419,6 +419,7 @@
   background: var(--bg-surface);
   border-left: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  min-height: 0;
   overflow: hidden;
   transition: width 0.25s ease, padding 0.25s ease;
 }
@@ -426,7 +427,9 @@
 .sidebar-open {
   width: 150px;
   padding: 10px 12px;
+  overflow-x: hidden;
   overflow-y: auto;
+  -webkit-app-region: no-drag;
 }
 
 .sidebar-title {
