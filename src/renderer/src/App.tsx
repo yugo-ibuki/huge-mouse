@@ -241,8 +241,11 @@ function App(): React.JSX.Element {
         if (selected) {
           window.api.capturePane(selected).then((content) => {
             setPaneContent(content)
+            // Double rAF: first for React render, second for layout
             requestAnimationFrame(() => {
-              paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+              requestAnimationFrame(() => {
+                paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+              })
             })
           })
         }
@@ -823,7 +826,20 @@ function App(): React.JSX.Element {
               </button>
             </div>
             <pre ref={paneViewerRef} className="pane-popup-content">
-              {paneContent}
+              {(() => {
+                if (!paneContent) return null
+                // Find the last Claude response (starts with ⏺)
+                const lastIdx = paneContent.lastIndexOf('\n⏺')
+                if (lastIdx === -1) return paneContent
+                const before = paneContent.slice(0, lastIdx + 1)
+                const after = paneContent.slice(lastIdx + 1)
+                return (
+                  <>
+                    {before}
+                    <span className="last-response">{after}</span>
+                  </>
+                )
+              })()}
             </pre>
           </div>
         </div>
