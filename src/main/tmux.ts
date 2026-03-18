@@ -245,7 +245,12 @@ export async function listPanes(): Promise<TmuxPane[]> {
     // Also check pane_title as a fallback — when codex spawns subprocesses,
     // pane_current_command may change to `node` while the title still contains `codex`.
     .filter((pane) => {
-      if (/^(claude|codex|ai)$/i.test(pane.command)) return true
+      if (/^(claude|codex|ai)(\b|-)/i.test(pane.command)) {
+        // Normalize variant names like `codex-aarch64-a` to `codex`
+        if (/^codex/i.test(pane.command)) pane.command = 'codex'
+        else if (/^claude/i.test(pane.command)) pane.command = 'claude'
+        return true
+      }
       if (/\b(claude|codex)\b/i.test(pane.title)) {
         // pane_current_command changed to a subprocess (e.g. node).
         // Normalize command so detectStatus routes correctly.
