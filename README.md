@@ -65,6 +65,7 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Cmd+↓` | Switch to next pane |
 | `Ctrl+1-9` | Send numbered choice directly (modifier key configurable) |
 | `Ctrl+H` / `Ctrl+L` | Switch to previous / next pane |
+| `Ctrl+Cmd+H` / `Ctrl+Cmd+L` | Jump to previous / next session |
 | `Ctrl+P` | Open pane content preview (key configurable) |
 | `Ctrl+D` | Open session detail popup (key configurable) |
 | `Ctrl+G` | Open git operations popup (key configurable) |
