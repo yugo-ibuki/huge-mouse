@@ -36,6 +36,11 @@ const api = {
     ipcRenderer.invoke('tmux:capture-pane', target),
   getPaneDetail: (target: string): Promise<PaneDetail | null> =>
     ipcRenderer.invoke('tmux:pane-detail', target),
+  listTmuxSessions: (): Promise<string[]> => ipcRenderer.invoke('tmux:list-tmux-sessions'),
+  createSession: (sessionName: string, command: 'claude' | 'codex'): Promise<SendResult> =>
+    ipcRenderer.invoke('tmux:create-session', { sessionName, command }),
+  killPane: (target: string): Promise<SendResult> =>
+    ipcRenderer.invoke('tmux:kill-pane', target),
   gitAdd: (cwd: string): Promise<SendResult> => ipcRenderer.invoke('git:add', cwd),
   gitCommit: (cwd: string, message: string): Promise<SendResult> =>
     ipcRenderer.invoke('git:commit', { cwd, message }),

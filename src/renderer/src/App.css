@@ -905,3 +905,63 @@
   margin-left: -10px;
   padding-right: 2px;
 }
+
+/* Create session dialog */
+.create-session-form {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.create-session-select {
+  background: var(--bg-surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: var(--font-size);
+}
+
+.create-session-btn {
+  align-self: flex-end;
+  padding: 6px 20px;
+}
+
+/* Detail panel kill button */
+.detail-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.detail-kill-btn {
+  background: #c53030;
+  color: #fff;
+}
+
+.detail-kill-btn:hover {
+  background: #e53e3e;
+}
+
+/* Confirm kill dialog */
+.confirm-popup {
+  max-width: 320px;
+}
+
+.confirm-body {
+  padding: 12px;
+  text-align: center;
+}
+
+.confirm-body p {
+  margin: 0 0 12px;
+  color: var(--fg);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}

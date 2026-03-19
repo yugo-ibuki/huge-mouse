@@ -83,6 +83,11 @@ function App(): React.JSX.Element {
   const [commitMsg, setCommitMsg] = useState('')
   const [gitResult, setGitResult] = useState<{ message: string; ok: boolean } | null>(null)
   const [gitPopup, setGitPopup] = useState<PaneDetail | null>(null)
+  const [createDialog, setCreateDialog] = useState(false)
+  const [tmuxSessions, setTmuxSessions] = useState<string[]>([])
+  const [newSessionTarget, setNewSessionTarget] = useState('')
+  const [newSessionCommand, setNewSessionCommand] = useState<'claude' | 'codex'>('claude')
+  const [confirmKill, setConfirmKill] = useState(false)
   const detailContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const paneViewerRef = useRef<HTMLPreElement>(null)
@@ -293,8 +298,36 @@ function App(): React.JSX.Element {
         }
       }
 
+      // Ctrl+N → open create session dialog
+      if (e.ctrlKey && e.key === 'n' && !e.metaKey) {
+        e.preventDefault()
+        window.api.listTmuxSessions().then((sessions) => {
+          setTmuxSessions(sessions)
+          setNewSessionTarget(sessions[0] ?? '')
+          setNewSessionCommand('claude')
+          setCreateDialog(true)
+        })
+      }
+
+      // Ctrl+C → confirm kill when detail panel is open
+      if (e.ctrlKey && e.key === 'c' && !e.metaKey && paneDetail !== null) {
+        e.preventDefault()
+        setConfirmKill(true)
+      }
+
       // Escape → close popups and refocus textarea
       if (e.key === 'Escape') {
+        if (confirmKill) {
+          e.preventDefault()
+          setConfirmKill(false)
+          return
+        }
+        if (createDialog) {
+          e.preventDefault()
+          setCreateDialog(false)
+          requestAnimationFrame(() => textareaRef.current?.focus())
+          return
+        }
         if (paneContent !== null) {
           e.preventDefault()
           setPaneContent(null)
@@ -312,7 +345,7 @@ function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [selected, panes, choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup])
+  }, [selected, panes, choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup, createDialog, confirmKill])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -901,6 +934,14 @@ function App(): React.JSX.Element {
               </button>
             </div>
             <div ref={detailContentRef} className="detail-grid">
+              <div className="detail-actions">
+                <button
+                  className="git-btn detail-kill-btn"
+                  onClick={() => setConfirmKill(true)}
+                >
+                  Close Session
+                </button>
+              </div>
               <span className="detail-label">Target</span>
               <span className="detail-value">{paneDetail.target}</span>
               <span className="detail-label">Command</span>
@@ -1035,6 +1076,147 @@ function App(): React.JSX.Element {
                   {gitResult.message}
                 </span>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createDialog && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => {
+            if (el && !el.dataset.focused) {
+              el.focus()
+              el.dataset.focused = 'true'
+            }
+          }}
+          onClick={() => { setCreateDialog(false); requestAnimationFrame(() => textareaRef.current?.focus()) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setCreateDialog(false)
+              requestAnimationFrame(() => textareaRef.current?.focus())
+              e.preventDefault()
+            }
+          }}
+        >
+          <div className="pane-popup detail-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">New Session</span>
+              <button className="pane-popup-close" onClick={() => { setCreateDialog(false); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
+                Esc
+              </button>
+            </div>
+            <div className="create-session-form">
+              <label className="setting-row">
+                <span className="setting-label">Session</span>
+                <select
+                  className="create-session-select"
+                  value={newSessionTarget}
+                  onChange={(e) => setNewSessionTarget(e.target.value)}
+                >
+                  {tmuxSessions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="setting-row">
+                <span className="setting-label">Command</span>
+                <div className="theme-segment">
+                  <button
+                    className={`theme-btn ${newSessionCommand === 'claude' ? 'theme-btn-active' : ''}`}
+                    onClick={() => setNewSessionCommand('claude')}
+                  >
+                    claude
+                  </button>
+                  <button
+                    className={`theme-btn ${newSessionCommand === 'codex' ? 'theme-btn-active' : ''}`}
+                    onClick={() => setNewSessionCommand('codex')}
+                  >
+                    codex
+                  </button>
+                </div>
+              </label>
+              <button
+                className="git-btn create-session-btn"
+                disabled={!newSessionTarget}
+                onClick={async () => {
+                  const r = await window.api.createSession(newSessionTarget, newSessionCommand)
+                  if (r.success) {
+                    setCreateDialog(false)
+                    setStatus({ message: `Created ${newSessionCommand} in ${newSessionTarget}`, ok: true })
+                    // Refresh pane list
+                    const result = await window.api.listSessions()
+                    setPanes(result)
+                  } else {
+                    setStatus({ message: r.error ?? 'Failed', ok: false })
+                  }
+                  setTimeout(() => setStatus(null), 2000)
+                  requestAnimationFrame(() => textareaRef.current?.focus())
+                }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmKill && paneDetail && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => {
+            if (el && !el.dataset.focused) {
+              el.focus()
+              el.dataset.focused = 'true'
+            }
+          }}
+          onClick={() => setConfirmKill(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setConfirmKill(false)
+              e.preventDefault()
+            }
+          }}
+        >
+          <div className="pane-popup detail-popup confirm-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">Confirm Close</span>
+            </div>
+            <div className="confirm-body">
+              <p>Close session <strong>{paneDetail.target}</strong> ({paneDetail.command})?</p>
+              <div className="confirm-actions">
+                <button
+                  className="git-btn"
+                  onClick={() => setConfirmKill(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="git-btn detail-kill-btn"
+                  onClick={async () => {
+                    const r = await window.api.killPane(paneDetail.target)
+                    setConfirmKill(false)
+                    setPaneDetail(null)
+                    if (r.success) {
+                      setStatus({ message: `Closed ${paneDetail.target}`, ok: true })
+                      if (selected === paneDetail.target) setSelected('')
+                      const result = await window.api.listSessions()
+                      setPanes(result)
+                      if (result.length > 0 && !result.find((p) => p.target === selected)) {
+                        setSelected(result[0].target)
+                      }
+                    } else {
+                      setStatus({ message: r.error ?? 'Failed', ok: false })
+                    }
+                    setTimeout(() => setStatus(null), 2000)
+                    requestAnimationFrame(() => textareaRef.current?.focus())
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

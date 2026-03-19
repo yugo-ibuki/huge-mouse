@@ -424,6 +424,42 @@ export async function gitPush(cwd: string): Promise<{ success: boolean; error?: 
   }
 }
 
+export async function listTmuxSessions(): Promise<string[]> {
+  try {
+    const stdout = await run(['list-sessions', '-F', '#{session_name}'])
+    return stdout
+      .trim()
+      .split('\n')
+      .filter((s) => s.length > 0)
+  } catch {
+    return []
+  }
+}
+
+export async function createSession(
+  sessionName: string,
+  command: 'claude' | 'codex'
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await run(['new-window', '-t', sessionName, command])
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function killPane(target: string): Promise<{ success: boolean; error?: string }> {
+  if (!TARGET_PATTERN.test(target)) {
+    return { success: false, error: 'Invalid target format' }
+  }
+  try {
+    await run(['kill-pane', '-t', target])
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
 export async function capturePane(target: string): Promise<string> {
   if (!TARGET_PATTERN.test(target)) return ''
   try {

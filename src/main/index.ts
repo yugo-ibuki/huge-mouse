@@ -1,7 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush } from './tmux'
+import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush, listTmuxSessions, createSession, killPane } from './tmux'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -51,6 +51,22 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tmux:pane-detail', async (_event, target: string) => {
     return getPaneDetail(target)
+  })
+
+  ipcMain.handle('tmux:list-tmux-sessions', async () => {
+    try {
+      return await listTmuxSessions()
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('tmux:create-session', async (_event, { sessionName, command }) => {
+    return createSession(sessionName, command)
+  })
+
+  ipcMain.handle('tmux:kill-pane', async (_event, target: string) => {
+    return killPane(target)
   })
 
   ipcMain.handle('git:add', async (_event, cwd: string) => gitAdd(cwd))
