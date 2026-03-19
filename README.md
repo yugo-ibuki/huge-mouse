@@ -69,6 +69,7 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Ctrl+D` | Open session detail popup (key configurable) |
 | `Ctrl+G` | Open git operations popup (key configurable) |
 | `Ctrl+W` | Toggle compact mode — shrinks window to tab bar only (key configurable) |
+| `/` | Open slash command autocomplete (when at start of input) |
 | `↑` / `↓` | Navigate input history |
 | `Cmd+Shift+H` | Focus huge-mouse from any app (key configurable) |
 | `Escape` | Close popup / refocus textarea |
@@ -84,6 +85,10 @@ Press `Ctrl+D` to view details of the selected pane: target, command, model, ses
 ### Git operations
 
 Press `Ctrl+G` to open git operations for the selected pane's working directory. You can **Add All**, **Commit** (with a message), and **Push** directly from the popup. Shortcuts within the popup: `Ctrl+A` (add all), `Ctrl+P` (push).
+
+### Slash commands
+
+Save reusable text snippets as slash commands (e.g., `/fix`, `/review`). Type `/` at the start of the textarea to see a filterable autocomplete list. Select a command with `Enter`, `Tab`, or click to insert its body. Manage commands in the **Slash Commands** section of the sidebar.
 
 ### Settings
 
@@ -101,6 +106,7 @@ Click the gear icon to access settings:
 - **Detail Key** — change the key for session detail popup (`Ctrl+<key>`)
 - **Git Key** — change the key for git operations popup (`Ctrl+<key>`)
 - **Focus Key** — change the global shortcut to focus huge-mouse (`Cmd+Shift+<key>`)
+- **Slash Commands** — add, edit, and delete reusable slash commands
 
 ## License
 

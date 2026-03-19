@@ -69,6 +69,7 @@ brew install --cask yugo-ibuki/tap/huge-mouse
 | `Ctrl+D` | セッション詳細ポップアップを表示（キーは設定で変更可能） |
 | `Ctrl+G` | git操作ポップアップを表示（キーは設定で変更可能） |
 | `Ctrl+W` | コンパクトモード切り替え — タブバーだけの細い表示に（キーは設定で変更可能） |
+| `/` | スラッシュコマンドの補完を表示（入力先頭で） |
 | `↑` / `↓` | 入力履歴をたどる |
 | `Cmd+Shift+H` | どのアプリからでもhuge-mouseにフォーカス（キーは設定で変更可能） |
 | `Escape` | ポップアップを閉じる / テキストエリアにフォーカス |
@@ -84,6 +85,10 @@ brew install --cask yugo-ibuki/tap/huge-mouse
 ### git操作
 
 `Ctrl+G` でペインの作業ディレクトリのgit操作ポップアップを表示。**Add All**、**Commit**（メッセージ入力）、**Push** を直接実行できます。ポップアップ内ショートカット：`Ctrl+A`（add all）、`Ctrl+P`（push）。
+
+### スラッシュコマンド
+
+よく使うテキストをスラッシュコマンドとして保存できます（例：`/fix`、`/review`）。テキストエリアの先頭で `/` を入力すると、フィルター付きの補完リストが表示されます。`Enter`、`Tab`、またはクリックでコマンドの内容を挿入。コマンドの管理はサイドバーの **Slash Commands** セクションから行えます。
 
 ### 設定
 
@@ -101,6 +106,7 @@ brew install --cask yugo-ibuki/tap/huge-mouse
 - **Detail Key** — セッション詳細のキーを変更（`Ctrl+<キー>`）
 - **Git Key** — git操作のキーを変更（`Ctrl+<キー>`）
 - **Focus Key** — huge-mouseにフォーカスするグローバルショートカットを変更（`Cmd+Shift+<キー>`）
+- **Slash Commands** — スラッシュコマンドの追加・編集・削除
 
 ## ライセンス
 
