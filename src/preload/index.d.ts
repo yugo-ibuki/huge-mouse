@@ -52,6 +52,9 @@ interface TmuxAPI {
   toggleCompact: () => Promise<boolean>
   onCompactChanged: (callback: (compact: boolean) => void) => () => void
   onFocusTextarea: (callback: () => void) => () => void
+  startStream: (target: string) => Promise<boolean>
+  stopStream: () => Promise<boolean>
+  onStreamData: (callback: (content: string) => void) => () => void
 }
 
 declare global {

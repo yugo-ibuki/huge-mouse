@@ -32,8 +32,7 @@ const api = {
   listSessions: (): Promise<TmuxPane[]> => ipcRenderer.invoke('tmux:list-sessions'),
   sendInput: (target: string, text: string, vimMode = false): Promise<SendResult> =>
     ipcRenderer.invoke('tmux:send-input', { target, text, vimMode }),
-  capturePane: (target: string): Promise<string> =>
-    ipcRenderer.invoke('tmux:capture-pane', target),
+  capturePane: (target: string): Promise<string> => ipcRenderer.invoke('tmux:capture-pane', target),
   getPaneDetail: (target: string): Promise<PaneDetail | null> =>
     ipcRenderer.invoke('tmux:pane-detail', target),
   gitAdd: (cwd: string): Promise<SendResult> => ipcRenderer.invoke('git:add', cwd),
@@ -43,13 +42,11 @@ const api = {
   setAlwaysOnTop: (value: boolean): Promise<boolean> =>
     ipcRenderer.invoke('window:set-always-on-top', value),
   getAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:get-always-on-top'),
-  setOpacity: (value: number): Promise<number> =>
-    ipcRenderer.invoke('window:set-opacity', value),
+  setOpacity: (value: number): Promise<number> => ipcRenderer.invoke('window:set-opacity', value),
   getOpacity: (): Promise<number> => ipcRenderer.invoke('window:get-opacity'),
   setFocusShortcut: (key: string): Promise<boolean> =>
     ipcRenderer.invoke('window:set-focus-shortcut', key),
-  toggleCompact: (): Promise<boolean> =>
-    ipcRenderer.invoke('window:toggle-compact'),
+  toggleCompact: (): Promise<boolean> => ipcRenderer.invoke('window:toggle-compact'),
   onCompactChanged: (callback: (compact: boolean) => void): (() => void) => {
     const handler = (_event: unknown, compact: boolean): void => callback(compact)
     ipcRenderer.on('compact-changed', handler)
@@ -60,6 +57,14 @@ const api = {
     ipcRenderer.on('focus-textarea', handler)
     return () => ipcRenderer.removeListener('focus-textarea', handler)
   },
+  startStream: (target: string): Promise<boolean> =>
+    ipcRenderer.invoke('tmux:start-stream', target),
+  stopStream: (): Promise<boolean> => ipcRenderer.invoke('tmux:stop-stream'),
+  onStreamData: (callback: (content: string) => void): (() => void) => {
+    const handler = (_event: unknown, content: string): void => callback(content)
+    ipcRenderer.on('tmux:stream-data', handler)
+    return () => ipcRenderer.removeListener('tmux:stream-data', handler)
+  }
 }
 
 if (process.contextIsolated) {

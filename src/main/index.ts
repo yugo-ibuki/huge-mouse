@@ -1,7 +1,51 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush } from './tmux'
+import {
+  listPanes,
+  sendInput,
+  capturePane,
+  getPaneDetail,
+  gitAdd,
+  gitCommit,
+  gitPush
+} from './tmux'
+
+// Streaming state: polls capture-pane and pushes new content to renderer
+let streamTarget: string | null = null
+let streamTimer: ReturnType<typeof setInterval> | null = null
+let lastStreamContent = ''
+
+function startStream(win: BrowserWindow, target: string): void {
+  stopStream()
+  streamTarget = target
+  lastStreamContent = ''
+
+  const tick = async (): Promise<void> => {
+    if (!streamTarget) return
+    try {
+      const content = await capturePane(streamTarget)
+      if (content !== lastStreamContent) {
+        lastStreamContent = content
+        win.webContents.send('tmux:stream-data', content)
+      }
+    } catch {
+      // pane may have closed
+    }
+  }
+
+  tick()
+  streamTimer = setInterval(tick, 500)
+}
+
+function stopStream(): void {
+  if (streamTimer) {
+    clearInterval(streamTimer)
+    streamTimer = null
+  }
+  streamTarget = null
+  lastStreamContent = ''
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -47,6 +91,17 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tmux:capture-pane', async (_event, target: string) => {
     return capturePane(target)
+  })
+
+  ipcMain.handle('tmux:start-stream', async (_event, target: string) => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) startStream(win, target)
+    return true
+  })
+
+  ipcMain.handle('tmux:stop-stream', async () => {
+    stopStream()
+    return true
   })
 
   ipcMain.handle('tmux:pane-detail', async (_event, target: string) => {

@@ -83,9 +83,11 @@ function App(): React.JSX.Element {
   const [commitMsg, setCommitMsg] = useState('')
   const [gitResult, setGitResult] = useState<{ message: string; ok: boolean } | null>(null)
   const [gitPopup, setGitPopup] = useState<PaneDetail | null>(null)
+  const [streaming, setStreaming] = useState(false)
   const detailContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const paneViewerRef = useRef<HTMLPreElement>(null)
+  const streamAutoScroll = useRef(true)
   const [history, setHistory] = useState<string[]>([])
   const historyIndex = useRef(-1)
   const savedDraft = useRef('')
@@ -121,6 +123,19 @@ function App(): React.JSX.Element {
       requestAnimationFrame(() => textareaRef.current?.focus())
     })
   }, [])
+
+  // Stream data listener: update paneContent when streaming
+  useEffect(() => {
+    if (!streaming) return
+    return window.api.onStreamData((content) => {
+      setPaneContent(content)
+      if (streamAutoScroll.current) {
+        requestAnimationFrame(() => {
+          paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+        })
+      }
+    })
+  }, [streaming])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -185,8 +200,10 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
-      const isPrevPane = (e.metaKey && e.key === 'ArrowUp') || (e.ctrlKey && e.key === 'h' && !e.metaKey)
-      const isNextPane = (e.metaKey && e.key === 'ArrowDown') || (e.ctrlKey && e.key === 'l' && !e.metaKey)
+      const isPrevPane =
+        (e.metaKey && e.key === 'ArrowUp') || (e.ctrlKey && e.key === 'h' && !e.metaKey)
+      const isNextPane =
+        (e.metaKey && e.key === 'ArrowDown') || (e.ctrlKey && e.key === 'l' && !e.metaKey)
       if (isPrevPane) {
         e.preventDefault()
         setPanes((prev) => {
@@ -235,19 +252,32 @@ function App(): React.JSX.Element {
         window.api.toggleCompact()
       }
 
-      // Ctrl+[previewKey] → show pane content popup
+      // Ctrl+[previewKey] → show pane content popup (static or streaming)
       if (e.ctrlKey && e.key === previewKey && !e.metaKey) {
         e.preventDefault()
         if (selected) {
-          window.api.capturePane(selected).then((content) => {
-            setPaneContent(content)
-            // Double rAF: first for React render, second for layout
-            requestAnimationFrame(() => {
+          if (paneContent !== null && !streaming) {
+            // Already showing static preview → upgrade to streaming
+            setStreaming(true)
+            streamAutoScroll.current = true
+            window.api.startStream(selected)
+          } else if (streaming) {
+            // Already streaming → close
+            setStreaming(false)
+            window.api.stopStream()
+            setPaneContent(null)
+            requestAnimationFrame(() => textareaRef.current?.focus())
+          } else {
+            // Not showing → open static preview
+            window.api.capturePane(selected).then((content) => {
+              setPaneContent(content)
               requestAnimationFrame(() => {
-                paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+                requestAnimationFrame(() => {
+                  paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+                })
               })
             })
-          })
+          }
         }
       }
 
@@ -278,7 +308,11 @@ function App(): React.JSX.Element {
         if (e.key === 'a') {
           e.preventDefault()
           window.api.gitAdd(gitPopup.cwd).then(async (r) => {
-            setGitResult(r.success ? { message: 'Staged all', ok: true } : { message: r.error ?? 'Failed', ok: false })
+            setGitResult(
+              r.success
+                ? { message: 'Staged all', ok: true }
+                : { message: r.error ?? 'Failed', ok: false }
+            )
             const refreshed = await window.api.getPaneDetail(gitPopup.target)
             if (refreshed) setGitPopup(refreshed)
             setTimeout(() => setGitResult(null), 2000)
@@ -287,7 +321,11 @@ function App(): React.JSX.Element {
         if (e.key === 'p') {
           e.preventDefault()
           window.api.gitPush(gitPopup.cwd).then((r) => {
-            setGitResult(r.success ? { message: 'Pushed', ok: true } : { message: r.error ?? 'Failed', ok: false })
+            setGitResult(
+              r.success
+                ? { message: 'Pushed', ok: true }
+                : { message: r.error ?? 'Failed', ok: false }
+            )
             setTimeout(() => setGitResult(null), 2000)
           })
         }
@@ -297,6 +335,10 @@ function App(): React.JSX.Element {
       if (e.key === 'Escape') {
         if (paneContent !== null) {
           e.preventDefault()
+          if (streaming) {
+            setStreaming(false)
+            window.api.stopStream()
+          }
           setPaneContent(null)
           requestAnimationFrame(() => textareaRef.current?.focus())
         } else if (paneDetail !== null) {
@@ -312,14 +354,26 @@ function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [selected, panes, choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup])
+  }, [
+    selected,
+    panes,
+    choiceModifier,
+    vimMode,
+    compactKey,
+    previewKey,
+    detailKey,
+    gitKey,
+    paneContent,
+    paneDetail,
+    gitPopup,
+    streaming
+  ])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.nativeEvent.isComposing) return
       if (e.key === 'Enter') {
-        const isSend =
-          sendKey === 'cmd+enter' ? e.metaKey : !e.metaKey && !e.shiftKey
+        const isSend = sendKey === 'cmd+enter' ? e.metaKey : !e.metaKey && !e.shiftKey
         if (isSend) {
           e.preventDefault()
           send()
@@ -354,8 +408,7 @@ function App(): React.JSX.Element {
       }
       if (e.key === 'ArrowDown' && !e.metaKey && historyIndex.current >= 0) {
         const ta = e.currentTarget as HTMLTextAreaElement
-        const isAtBottom =
-          !ta.value.includes('\n') || ta.selectionStart === ta.value.length
+        const isAtBottom = !ta.value.includes('\n') || ta.selectionStart === ta.value.length
         if (isAtBottom) {
           e.preventDefault()
           if (historyIndex.current < history.length - 1) {
@@ -408,7 +461,9 @@ function App(): React.JSX.Element {
                     }}
                   >
                     <span className={`dot dot-${p.status}`} />
-                    <span className={`cmd-badge cmd-badge-${p.command}`}>{p.command === 'codex' ? 'CX' : 'CC'}</span>
+                    <span className={`cmd-badge cmd-badge-${p.command}`}>
+                      {p.command === 'codex' ? 'CX' : 'CC'}
+                    </span>
                     {p.target.split(':')[1]}
                   </button>
                   {p.choices.length > 0 && (
@@ -422,7 +477,8 @@ function App(): React.JSX.Element {
                           onKeyDown={(e) => {
                             if (e.key === 'Tab' && !e.shiftKey) {
                               e.preventDefault()
-                              const next = e.currentTarget.nextElementSibling as HTMLButtonElement | null
+                              const next = e.currentTarget
+                                .nextElementSibling as HTMLButtonElement | null
                               if (next) {
                                 next.focus()
                               } else {
@@ -433,11 +489,14 @@ function App(): React.JSX.Element {
                             }
                             if (e.key === 'Tab' && e.shiftKey) {
                               e.preventDefault()
-                              const prev = e.currentTarget.previousElementSibling as HTMLButtonElement | null
+                              const prev = e.currentTarget
+                                .previousElementSibling as HTMLButtonElement | null
                               if (prev) {
                                 prev.focus()
                               } else {
-                                const tag = e.currentTarget.closest('.tag-row')?.querySelector<HTMLButtonElement>('.tag')
+                                const tag = e.currentTarget
+                                  .closest('.tag-row')
+                                  ?.querySelector<HTMLButtonElement>('.tag')
                                 tag?.focus()
                               }
                             }
@@ -463,325 +522,335 @@ function App(): React.JSX.Element {
         </button>
       </div>
 
-      {!compact && <div className="main-area">
-        <div className="content">
-          {selectedPane?.prompt && (
-            <div className="prompt-box">
-              <pre className="prompt-text">{selectedPane.prompt}</pre>
-              {selectedPane.choices.length > 0 && (
-                <div className="prompt-choices">
-                  {selectedPane.choices.map((c) => (
-                    <button
-                      key={c.number}
-                      className="prompt-choice-btn"
-                      onClick={async () => {
-                        await window.api.sendInput(selectedPane.target, c.number, vimMode)
-                        setStatus({
-                          message: `Sent ${c.number} → ${selectedPane.target}`,
-                          ok: true
-                        })
-                        setTimeout(() => setStatus(null), 2000)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Tab' && !e.shiftKey) {
-                          const next = e.currentTarget.nextElementSibling as HTMLButtonElement | null
-                          if (!next) {
-                            e.preventDefault()
-                            document.querySelector<HTMLTextAreaElement>('.textarea')?.focus()
+      {!compact && (
+        <div className="main-area">
+          <div className="content">
+            {selectedPane?.prompt && (
+              <div className="prompt-box">
+                <pre className="prompt-text">{selectedPane.prompt}</pre>
+                {selectedPane.choices.length > 0 && (
+                  <div className="prompt-choices">
+                    {selectedPane.choices.map((c) => (
+                      <button
+                        key={c.number}
+                        className="prompt-choice-btn"
+                        onClick={async () => {
+                          await window.api.sendInput(selectedPane.target, c.number, vimMode)
+                          setStatus({
+                            message: `Sent ${c.number} → ${selectedPane.target}`,
+                            ok: true
+                          })
+                          setTimeout(() => setStatus(null), 2000)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Tab' && !e.shiftKey) {
+                            const next = e.currentTarget
+                              .nextElementSibling as HTMLButtonElement | null
+                            if (!next) {
+                              e.preventDefault()
+                              document.querySelector<HTMLTextAreaElement>('.textarea')?.focus()
+                            }
                           }
-                        }
-                      }}
-                    >
-                      {c.number}. {c.label}
-                    </button>
-                  ))}
-                </div>
+                        }}
+                      >
+                        {c.number}. {c.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <textarea
+              ref={textareaRef}
+              className="textarea"
+              rows={5}
+              placeholder={`Type input to send... (${sendKey === 'cmd+enter' ? 'Cmd+Enter' : 'Enter'} to send)`}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+
+            <div className="footer">
+              {status && (
+                <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>
               )}
+              <button className="send-btn" onClick={send} disabled={!selected || !text.trim()}>
+                Send
+              </button>
             </div>
-          )}
+          </div>
 
-          <textarea
-            ref={textareaRef}
-            className="textarea"
-            rows={5}
-            placeholder={`Type input to send... (${sendKey === 'cmd+enter' ? 'Cmd+Enter' : 'Enter'} to send)`}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-
-          <div className="footer">
-            {status && (
-              <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>
-            )}
-            <button className="send-btn" onClick={send} disabled={!selected || !text.trim()}>
-              Send
-            </button>
+          <div className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
+            <div className="sidebar-title">Settings</div>
+            <label className="setting-row">
+              <span className="setting-label">Always on Top</span>
+              <button
+                className={`toggle ${alwaysOnTop ? 'toggle-on' : ''}`}
+                onClick={toggleAlwaysOnTop}
+              >
+                <span className="toggle-knob" />
+              </button>
+            </label>
+            <label className="setting-row">
+              <span className="setting-label">Opacity</span>
+              <input
+                type="range"
+                className="opacity-slider"
+                min="0.5"
+                max="1"
+                step="0.05"
+                value={opacity}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  setOpacity(v)
+                  localStorage.setItem('opacity', String(v))
+                  window.api.setOpacity(v)
+                }}
+              />
+            </label>
+            <label className="setting-row">
+              <span className="setting-label">Font Size</span>
+              <input
+                type="range"
+                className="opacity-slider"
+                min="8"
+                max="18"
+                step="1"
+                value={fontSize}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  setFontSize(v)
+                  localStorage.setItem('fontSize', String(v))
+                }}
+              />
+            </label>
+            <div
+              className="setting-row"
+              style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}
+            >
+              <span className="setting-label">Theme</span>
+              <div className="theme-segment">
+                <button
+                  className={`theme-btn ${theme === 'dark' ? 'theme-btn-active' : ''}`}
+                  onClick={() => setTheme('dark')}
+                >
+                  Dark
+                </button>
+                <button
+                  className={`theme-btn ${theme === 'light' ? 'theme-btn-active' : ''}`}
+                  onClick={() => setTheme('light')}
+                >
+                  Light
+                </button>
+              </div>
+            </div>
+            <div
+              className="setting-row"
+              style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}
+            >
+              <span className="setting-label">Choice Key</span>
+              <div className="theme-segment">
+                <button
+                  className={`theme-btn ${choiceModifier === 'ctrl' ? 'theme-btn-active' : ''}`}
+                  onClick={() => setChoiceModifier('ctrl')}
+                >
+                  Ctrl
+                </button>
+                <button
+                  className={`theme-btn ${choiceModifier === 'cmd' ? 'theme-btn-active' : ''}`}
+                  onClick={() => setChoiceModifier('cmd')}
+                >
+                  Cmd
+                </button>
+              </div>
+            </div>
+            <div
+              className="setting-row"
+              style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}
+            >
+              <span className="setting-label">Send Key</span>
+              <div className="theme-segment">
+                <button
+                  className={`theme-btn ${sendKey === 'cmd+enter' ? 'theme-btn-active' : ''}`}
+                  onClick={() => {
+                    setSendKey('cmd+enter')
+                    localStorage.setItem('sendKey', 'cmd+enter')
+                  }}
+                >
+                  ⌘↵
+                </button>
+                <button
+                  className={`theme-btn ${sendKey === 'enter' ? 'theme-btn-active' : ''}`}
+                  onClick={() => {
+                    setSendKey('enter')
+                    localStorage.setItem('sendKey', 'enter')
+                  }}
+                >
+                  ↵
+                </button>
+              </div>
+            </div>
+            <label className="setting-row">
+              <span className="setting-label">Vim Mode</span>
+              <button
+                className={`toggle ${vimMode ? 'toggle-on' : ''}`}
+                onClick={() => {
+                  const next = !vimMode
+                  setVimMode(next)
+                  localStorage.setItem('vimMode', String(next))
+                }}
+              >
+                <span className="toggle-knob" />
+              </button>
+            </label>
+            <label className="setting-row">
+              <span className="setting-label">Compact Key</span>
+              {editingCompactKey ? (
+                <span
+                  className="key-capture"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    e.preventDefault()
+                    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+                      setCompactKey(e.key.toLowerCase())
+                      setEditingCompactKey(false)
+                    }
+                    if (e.key === 'Escape') {
+                      setEditingCompactKey(false)
+                    }
+                  }}
+                  ref={(el) => el?.focus()}
+                >
+                  Press a key...
+                </span>
+              ) : (
+                <button className="key-display" onClick={() => setEditingCompactKey(true)}>
+                  Ctrl+{compactKey.toUpperCase()}
+                </button>
+              )}
+            </label>
+            <label className="setting-row">
+              <span className="setting-label">Preview Key</span>
+              {editingPreviewKey ? (
+                <span
+                  className="key-capture"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    e.preventDefault()
+                    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+                      setPreviewKey(e.key.toLowerCase())
+                      setEditingPreviewKey(false)
+                    }
+                    if (e.key === 'Escape') {
+                      setEditingPreviewKey(false)
+                    }
+                  }}
+                  ref={(el) => el?.focus()}
+                >
+                  Press a key...
+                </span>
+              ) : (
+                <button className="key-display" onClick={() => setEditingPreviewKey(true)}>
+                  Ctrl+{previewKey.toUpperCase()}
+                </button>
+              )}
+            </label>
+            <label className="setting-row">
+              <span className="setting-label">Detail Key</span>
+              {editingDetailKey ? (
+                <span
+                  className="key-capture"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    e.preventDefault()
+                    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+                      setDetailKey(e.key.toLowerCase())
+                      setEditingDetailKey(false)
+                    }
+                    if (e.key === 'Escape') {
+                      setEditingDetailKey(false)
+                    }
+                  }}
+                  ref={(el) => el?.focus()}
+                >
+                  Press a key...
+                </span>
+              ) : (
+                <button className="key-display" onClick={() => setEditingDetailKey(true)}>
+                  Ctrl+{detailKey.toUpperCase()}
+                </button>
+              )}
+            </label>
+            <label className="setting-row">
+              <span className="setting-label">Git Key</span>
+              {editingGitKey ? (
+                <span
+                  className="key-capture"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    e.preventDefault()
+                    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+                      setGitKey(e.key.toLowerCase())
+                      setEditingGitKey(false)
+                    }
+                    if (e.key === 'Escape') {
+                      setEditingGitKey(false)
+                    }
+                  }}
+                  ref={(el) => el?.focus()}
+                >
+                  Press a key...
+                </span>
+              ) : (
+                <button className="key-display" onClick={() => setEditingGitKey(true)}>
+                  Ctrl+{gitKey.toUpperCase()}
+                </button>
+              )}
+            </label>
+            <label className="setting-row">
+              <span className="setting-label">Focus Key</span>
+              {editingFocusKey ? (
+                <span
+                  className="key-capture"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    e.preventDefault()
+                    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+                      setFocusKey(e.key.toLowerCase())
+                      setEditingFocusKey(false)
+                    }
+                    if (e.key === 'Escape') {
+                      setEditingFocusKey(false)
+                    }
+                  }}
+                  ref={(el) => el?.focus()}
+                >
+                  Press a key...
+                </span>
+              ) : (
+                <button className="key-display" onClick={() => setEditingFocusKey(true)}>
+                  ⌘⇧{focusKey.toUpperCase()}
+                </button>
+              )}
+            </label>
           </div>
         </div>
-
-        <div className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
-          <div className="sidebar-title">Settings</div>
-          <label className="setting-row">
-            <span className="setting-label">Always on Top</span>
-            <button
-              className={`toggle ${alwaysOnTop ? 'toggle-on' : ''}`}
-              onClick={toggleAlwaysOnTop}
-            >
-              <span className="toggle-knob" />
-            </button>
-          </label>
-          <label className="setting-row">
-            <span className="setting-label">Opacity</span>
-            <input
-              type="range"
-              className="opacity-slider"
-              min="0.5"
-              max="1"
-              step="0.05"
-              value={opacity}
-              onChange={(e) => {
-                const v = Number(e.target.value)
-                setOpacity(v)
-                localStorage.setItem('opacity', String(v))
-                window.api.setOpacity(v)
-              }}
-            />
-          </label>
-          <label className="setting-row">
-            <span className="setting-label">Font Size</span>
-            <input
-              type="range"
-              className="opacity-slider"
-              min="8"
-              max="18"
-              step="1"
-              value={fontSize}
-              onChange={(e) => {
-                const v = Number(e.target.value)
-                setFontSize(v)
-                localStorage.setItem('fontSize', String(v))
-              }}
-            />
-          </label>
-          <div
-            className="setting-row"
-            style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}
-          >
-            <span className="setting-label">Theme</span>
-            <div className="theme-segment">
-              <button
-                className={`theme-btn ${theme === 'dark' ? 'theme-btn-active' : ''}`}
-                onClick={() => setTheme('dark')}
-              >
-                Dark
-              </button>
-              <button
-                className={`theme-btn ${theme === 'light' ? 'theme-btn-active' : ''}`}
-                onClick={() => setTheme('light')}
-              >
-                Light
-              </button>
-            </div>
-          </div>
-          <div
-            className="setting-row"
-            style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}
-          >
-            <span className="setting-label">Choice Key</span>
-            <div className="theme-segment">
-              <button
-                className={`theme-btn ${choiceModifier === 'ctrl' ? 'theme-btn-active' : ''}`}
-                onClick={() => setChoiceModifier('ctrl')}
-              >
-                Ctrl
-              </button>
-              <button
-                className={`theme-btn ${choiceModifier === 'cmd' ? 'theme-btn-active' : ''}`}
-                onClick={() => setChoiceModifier('cmd')}
-              >
-                Cmd
-              </button>
-            </div>
-          </div>
-          <div
-            className="setting-row"
-            style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}
-          >
-            <span className="setting-label">Send Key</span>
-            <div className="theme-segment">
-              <button
-                className={`theme-btn ${sendKey === 'cmd+enter' ? 'theme-btn-active' : ''}`}
-                onClick={() => {
-                  setSendKey('cmd+enter')
-                  localStorage.setItem('sendKey', 'cmd+enter')
-                }}
-              >
-                ⌘↵
-              </button>
-              <button
-                className={`theme-btn ${sendKey === 'enter' ? 'theme-btn-active' : ''}`}
-                onClick={() => {
-                  setSendKey('enter')
-                  localStorage.setItem('sendKey', 'enter')
-                }}
-              >
-                ↵
-              </button>
-            </div>
-          </div>
-          <label className="setting-row">
-            <span className="setting-label">Vim Mode</span>
-            <button
-              className={`toggle ${vimMode ? 'toggle-on' : ''}`}
-              onClick={() => {
-                const next = !vimMode
-                setVimMode(next)
-                localStorage.setItem('vimMode', String(next))
-              }}
-            >
-              <span className="toggle-knob" />
-            </button>
-          </label>
-          <label className="setting-row">
-            <span className="setting-label">Compact Key</span>
-            {editingCompactKey ? (
-              <span
-                className="key-capture"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  e.preventDefault()
-                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
-                    setCompactKey(e.key.toLowerCase())
-                    setEditingCompactKey(false)
-                  }
-                  if (e.key === 'Escape') {
-                    setEditingCompactKey(false)
-                  }
-                }}
-                ref={(el) => el?.focus()}
-              >
-                Press a key...
-              </span>
-            ) : (
-              <button className="key-display" onClick={() => setEditingCompactKey(true)}>
-                Ctrl+{compactKey.toUpperCase()}
-              </button>
-            )}
-          </label>
-          <label className="setting-row">
-            <span className="setting-label">Preview Key</span>
-            {editingPreviewKey ? (
-              <span
-                className="key-capture"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  e.preventDefault()
-                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
-                    setPreviewKey(e.key.toLowerCase())
-                    setEditingPreviewKey(false)
-                  }
-                  if (e.key === 'Escape') {
-                    setEditingPreviewKey(false)
-                  }
-                }}
-                ref={(el) => el?.focus()}
-              >
-                Press a key...
-              </span>
-            ) : (
-              <button className="key-display" onClick={() => setEditingPreviewKey(true)}>
-                Ctrl+{previewKey.toUpperCase()}
-              </button>
-            )}
-          </label>
-          <label className="setting-row">
-            <span className="setting-label">Detail Key</span>
-            {editingDetailKey ? (
-              <span
-                className="key-capture"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  e.preventDefault()
-                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
-                    setDetailKey(e.key.toLowerCase())
-                    setEditingDetailKey(false)
-                  }
-                  if (e.key === 'Escape') {
-                    setEditingDetailKey(false)
-                  }
-                }}
-                ref={(el) => el?.focus()}
-              >
-                Press a key...
-              </span>
-            ) : (
-              <button className="key-display" onClick={() => setEditingDetailKey(true)}>
-                Ctrl+{detailKey.toUpperCase()}
-              </button>
-            )}
-          </label>
-          <label className="setting-row">
-            <span className="setting-label">Git Key</span>
-            {editingGitKey ? (
-              <span
-                className="key-capture"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  e.preventDefault()
-                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
-                    setGitKey(e.key.toLowerCase())
-                    setEditingGitKey(false)
-                  }
-                  if (e.key === 'Escape') {
-                    setEditingGitKey(false)
-                  }
-                }}
-                ref={(el) => el?.focus()}
-              >
-                Press a key...
-              </span>
-            ) : (
-              <button className="key-display" onClick={() => setEditingGitKey(true)}>
-                Ctrl+{gitKey.toUpperCase()}
-              </button>
-            )}
-          </label>
-          <label className="setting-row">
-            <span className="setting-label">Focus Key</span>
-            {editingFocusKey ? (
-              <span
-                className="key-capture"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  e.preventDefault()
-                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
-                    setFocusKey(e.key.toLowerCase())
-                    setEditingFocusKey(false)
-                  }
-                  if (e.key === 'Escape') {
-                    setEditingFocusKey(false)
-                  }
-                }}
-                ref={(el) => el?.focus()}
-              >
-                Press a key...
-              </span>
-            ) : (
-              <button className="key-display" onClick={() => setEditingFocusKey(true)}>
-                ⌘⇧{focusKey.toUpperCase()}
-              </button>
-            )}
-          </label>
-        </div>
-      </div>}
+      )}
 
       {paneContent !== null && (
         <div
           className="pane-overlay"
           tabIndex={-1}
           ref={(el) => el?.focus()}
-          onClick={() => { setPaneContent(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}
+          onClick={() => {
+            if (streaming) {
+              setStreaming(false)
+              window.api.stopStream()
+            }
+            setPaneContent(null)
+            requestAnimationFrame(() => textareaRef.current?.focus())
+          }}
           onKeyDown={(e) => {
             const el = paneViewerRef.current
             if (!el) return
@@ -790,24 +859,34 @@ function App(): React.JSX.Element {
             switch (e.key) {
               case 'j':
                 el.scrollBy(0, line)
+                streamAutoScroll.current = false
                 break
               case 'k':
                 el.scrollBy(0, -line)
+                streamAutoScroll.current = false
                 break
               case 'd':
                 el.scrollBy(0, half)
+                streamAutoScroll.current = false
                 break
               case 'u':
                 el.scrollBy(0, -half)
+                streamAutoScroll.current = false
                 break
               case 'g':
                 el.scrollTo(0, 0)
+                streamAutoScroll.current = false
                 break
               case 'G':
                 el.scrollTo(0, el.scrollHeight)
+                streamAutoScroll.current = true
                 break
               case 'Escape':
               case 'q':
+                if (streaming) {
+                  setStreaming(false)
+                  window.api.stopStream()
+                }
                 setPaneContent(null)
                 requestAnimationFrame(() => textareaRef.current?.focus())
                 break
@@ -820,8 +899,35 @@ function App(): React.JSX.Element {
           <div className="pane-popup" onClick={(e) => e.stopPropagation()}>
             <div className="pane-popup-header">
               <span className="pane-popup-title">{selected}</span>
+              {streaming && <span className="stream-badge">LIVE</span>}
+              <button
+                className={`stream-toggle ${streaming ? 'stream-toggle-on' : ''}`}
+                onClick={() => {
+                  if (streaming) {
+                    setStreaming(false)
+                    window.api.stopStream()
+                  } else {
+                    setStreaming(true)
+                    streamAutoScroll.current = true
+                    window.api.startStream(selected)
+                  }
+                }}
+                title={streaming ? 'Stop streaming' : 'Start streaming'}
+              >
+                {streaming ? '⏸' : '▶'}
+              </button>
               <span className="pane-popup-hint">j/k d/u g/G q</span>
-              <button className="pane-popup-close" onClick={() => { setPaneContent(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
+              <button
+                className="pane-popup-close"
+                onClick={() => {
+                  if (streaming) {
+                    setStreaming(false)
+                    window.api.stopStream()
+                  }
+                  setPaneContent(null)
+                  requestAnimationFrame(() => textareaRef.current?.focus())
+                }}
+              >
                 Esc
               </button>
             </div>
@@ -855,7 +961,10 @@ function App(): React.JSX.Element {
               el.dataset.focused = 'true'
             }
           }}
-          onClick={() => { setPaneDetail(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}
+          onClick={() => {
+            setPaneDetail(null)
+            requestAnimationFrame(() => textareaRef.current?.focus())
+          }}
           onKeyDown={(e) => {
             if ((e.target as HTMLElement).tagName === 'INPUT') return
             const el = detailContentRef.current
@@ -896,7 +1005,13 @@ function App(): React.JSX.Element {
             <div className="pane-popup-header">
               <span className="pane-popup-title">Session Detail</span>
               <span className="pane-popup-hint">j/k d/u g/G q</span>
-              <button className="pane-popup-close" onClick={() => { setPaneDetail(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
+              <button
+                className="pane-popup-close"
+                onClick={() => {
+                  setPaneDetail(null)
+                  requestAnimationFrame(() => textareaRef.current?.focus())
+                }}
+              >
                 Esc
               </button>
             </div>
@@ -950,7 +1065,10 @@ function App(): React.JSX.Element {
               el.dataset.focused = 'true'
             }
           }}
-          onClick={() => { setGitPopup(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}
+          onClick={() => {
+            setGitPopup(null)
+            requestAnimationFrame(() => textareaRef.current?.focus())
+          }}
           onKeyDown={(e) => {
             if ((e.target as HTMLElement).tagName === 'INPUT') return
             if (e.key === 'Escape' || e.key === 'q') {
@@ -964,12 +1082,20 @@ function App(): React.JSX.Element {
             <div className="pane-popup-header">
               <span className="pane-popup-title">Git — {gitPopup.gitBranch}</span>
               <span className="pane-popup-hint">^a add ^p push</span>
-              <button className="pane-popup-close" onClick={() => { setGitPopup(null); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
+              <button
+                className="pane-popup-close"
+                onClick={() => {
+                  setGitPopup(null)
+                  requestAnimationFrame(() => textareaRef.current?.focus())
+                }}
+              >
                 Esc
               </button>
             </div>
             {gitPopup.gitStatus && (
-              <pre className="detail-value detail-git-status" style={{ margin: '8px 12px' }}>{gitPopup.gitStatus}</pre>
+              <pre className="detail-value detail-git-status" style={{ margin: '8px 12px' }}>
+                {gitPopup.gitStatus}
+              </pre>
             )}
             <div className="git-actions">
               <div className="git-actions-row">
@@ -977,7 +1103,11 @@ function App(): React.JSX.Element {
                   className="git-btn"
                   onClick={async () => {
                     const r = await window.api.gitAdd(gitPopup.cwd)
-                    setGitResult(r.success ? { message: 'Staged all', ok: true } : { message: r.error ?? 'Failed', ok: false })
+                    setGitResult(
+                      r.success
+                        ? { message: 'Staged all', ok: true }
+                        : { message: r.error ?? 'Failed', ok: false }
+                    )
                     const refreshed = await window.api.getPaneDetail(gitPopup.target)
                     if (refreshed) setGitPopup(refreshed)
                     setTimeout(() => setGitResult(null), 2000)
@@ -989,7 +1119,11 @@ function App(): React.JSX.Element {
                   className="git-btn git-btn-push"
                   onClick={async () => {
                     const r = await window.api.gitPush(gitPopup.cwd)
-                    setGitResult(r.success ? { message: 'Pushed', ok: true } : { message: r.error ?? 'Failed', ok: false })
+                    setGitResult(
+                      r.success
+                        ? { message: 'Pushed', ok: true }
+                        : { message: r.error ?? 'Failed', ok: false }
+                    )
                     setTimeout(() => setGitResult(null), 2000)
                   }}
                 >
@@ -1006,7 +1140,11 @@ function App(): React.JSX.Element {
                     e.stopPropagation()
                     if (e.key === 'Enter' && commitMsg.trim()) {
                       window.api.gitCommit(gitPopup.cwd, commitMsg.trim()).then(async (r) => {
-                        setGitResult(r.success ? { message: 'Committed', ok: true } : { message: r.error ?? 'Failed', ok: false })
+                        setGitResult(
+                          r.success
+                            ? { message: 'Committed', ok: true }
+                            : { message: r.error ?? 'Failed', ok: false }
+                        )
                         if (r.success) setCommitMsg('')
                         const refreshed = await window.api.getPaneDetail(gitPopup.target)
                         if (refreshed) setGitPopup(refreshed)
@@ -1020,7 +1158,11 @@ function App(): React.JSX.Element {
                   disabled={!commitMsg.trim()}
                   onClick={async () => {
                     const r = await window.api.gitCommit(gitPopup.cwd, commitMsg.trim())
-                    setGitResult(r.success ? { message: 'Committed', ok: true } : { message: r.error ?? 'Failed', ok: false })
+                    setGitResult(
+                      r.success
+                        ? { message: 'Committed', ok: true }
+                        : { message: r.error ?? 'Failed', ok: false }
+                    )
                     if (r.success) setCommitMsg('')
                     const refreshed = await window.api.getPaneDetail(gitPopup.target)
                     if (refreshed) setGitPopup(refreshed)
