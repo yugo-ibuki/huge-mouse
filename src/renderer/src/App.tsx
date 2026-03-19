@@ -187,7 +187,34 @@ function App(): React.JSX.Element {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
       const isPrevPane = (e.metaKey && e.key === 'ArrowUp') || (e.ctrlKey && e.key === 'h' && !e.metaKey)
       const isNextPane = (e.metaKey && e.key === 'ArrowDown') || (e.ctrlKey && e.key === 'l' && !e.metaKey)
-      if (isPrevPane) {
+      // Ctrl+Cmd+H/L → jump across session boundaries
+      const isPrevSession = e.ctrlKey && e.metaKey && e.key === 'h'
+      const isNextSession = e.ctrlKey && e.metaKey && e.key === 'l'
+      if (isPrevSession || isNextSession) {
+        e.preventDefault()
+        setPanes((prev) => {
+          if (prev.length === 0) return prev
+          const sessionNames: string[] = []
+          const sessionFirstIdx: number[] = []
+          for (let i = 0; i < prev.length; i++) {
+            const sess = prev[i].target.split(':')[0]
+            if (sessionNames[sessionNames.length - 1] !== sess) {
+              sessionNames.push(sess)
+              sessionFirstIdx.push(i)
+            }
+          }
+          const currentSess = selected ? selected.split(':')[0] : ''
+          const currentSessionIdx = sessionNames.indexOf(currentSess)
+          let nextSessionIdx: number
+          if (isPrevSession) {
+            nextSessionIdx = currentSessionIdx > 0 ? currentSessionIdx - 1 : sessionNames.length - 1
+          } else {
+            nextSessionIdx = currentSessionIdx < sessionNames.length - 1 ? currentSessionIdx + 1 : 0
+          }
+          setSelected(prev[sessionFirstIdx[nextSessionIdx]].target)
+          return prev
+        })
+      } else if (isPrevPane) {
         e.preventDefault()
         setPanes((prev) => {
           const idx = prev.findIndex((p) => p.target === selected)
