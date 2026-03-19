@@ -177,9 +177,20 @@ function parsePrompt(content: string): string {
   return promptLines.join('\n').trim()
 }
 
-// Codex hint line contains "send", "newline", "transcript", "quit" when idle.
-// Unicode chars (⏎, ⌃) may not survive tmux capture-pane, so match ASCII keywords.
-const CODEX_IDLE_PATTERN = /send\s+.*newline\s+.*quit/
+// Codex displays "-ing" words during processing: Working, Thinking, Reconnecting, etc.
+// These typically appear with "esc to interrupt" nearby.
+const CODEX_BUSY_PATTERNS = [
+  /\b(?:Working|Thinking|Reconnecting|Connecting|Executing)\b/,
+  /esc to interrupt/i
+]
+
+// Codex footer hint when idle: "Enter to send", "Ctrl+J" / "newline", "quit" etc.
+// The Rust TUI may show these on separate lines or in different formats,
+// so check for any of them individually rather than requiring all on one line.
+const CODEX_IDLE_INDICATORS = [
+  /enter\s+to\s+send/i,
+  /\bsend\b.*\bnewline\b.*\bquit\b/ // legacy format (backward compat)
+]
 
 function detectStatusClaude(title: string, content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
   if (!title.includes('✳')) return { status: 'busy', choices: [], prompt: '' }
@@ -199,20 +210,23 @@ function detectStatusClaude(title: string, content: string): { status: PaneStatu
   return { status: 'idle', choices: [], prompt: '' }
 }
 
-// Codex shows "Esc to interrupt" during any processing state
-const CODEX_BUSY_PATTERN = /Esc to interrupt/
-
 // Codex presents options as indented "- " list items
 const CODEX_OPTION_PATTERN = /^\s+-\s+\S/
 // "- ...?" is a definitive question/choice indicator
 const CODEX_QUESTION_PATTERN = /^\s+-\s+.+\?/
 
 function detectStatusCodex(content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
-  if (CODEX_BUSY_PATTERN.test(content)) {
+  const lines = content.split('\n').slice(-15)
+  const tail = lines.join('\n')
+
+  // 1. Check for explicit busy signals (-ing words or "esc to interrupt")
+  const isBusy = CODEX_BUSY_PATTERNS.some((p) => p.test(tail))
+  if (isBusy) {
     return { status: 'busy', choices: [], prompt: '' }
   }
-  const lines = content.split('\n').slice(-15)
-  const isIdle = lines.some((line) => CODEX_IDLE_PATTERN.test(line))
+
+  // 2. Check for explicit idle signals (footer hints)
+  const isIdle = CODEX_IDLE_INDICATORS.some((p) => p.test(tail))
   if (isIdle) {
     const hasQuestion = lines.some((line) => CODEX_QUESTION_PATTERN.test(line))
     const optionCount = lines.filter((line) => CODEX_OPTION_PATTERN.test(line)).length
@@ -221,7 +235,11 @@ function detectStatusCodex(content: string): { status: PaneStatus; choices: Tmux
     }
     return { status: 'idle', choices: [], prompt: '' }
   }
-  return { status: 'busy', choices: [], prompt: '' }
+
+  // 3. No busy signal detected → default to idle (not busy).
+  // If Codex is NOT showing "Working"/"Thinking"/etc,
+  // it is most likely at the input prompt waiting for user input.
+  return { status: 'idle', choices: [], prompt: '' }
 }
 
 function detectStatus(title: string, content: string, command: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
