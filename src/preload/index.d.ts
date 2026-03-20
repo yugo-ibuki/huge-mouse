@@ -1,5 +1,10 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
+interface SkillEntry {
+  name: string
+  description: string
+}
+
 interface TmuxChoice {
   number: string
   label: string
@@ -38,6 +43,10 @@ interface SendResult {
 
 interface TmuxAPI {
   listSessions: () => Promise<TmuxPane[]>
+  listSkills: (cwd: string) => Promise<{ user: SkillEntry[]; project: SkillEntry[] }>
+  listTmuxSessions: () => Promise<string[]>
+  createSession: (sessionName: string, command: 'claude' | 'codex') => Promise<SendResult>
+  killPane: (target: string) => Promise<SendResult>
   sendInput: (target: string, text: string, vimMode?: boolean) => Promise<SendResult>
   capturePane: (target: string) => Promise<string>
   getPaneDetail: (target: string) => Promise<PaneDetail | null>

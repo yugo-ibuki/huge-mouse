@@ -72,6 +72,9 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Ctrl+C` | Close session with confirmation (when detail panel is open) |
 | `Ctrl+G` | Open git operations popup (key configurable) |
 | `Ctrl+W` | Toggle compact mode — shrinks window to tab bar only (key configurable) |
+| `Ctrl+N` | Create a new session (select target tmux session and command) |
+| `/` | Open slash command autocomplete (when at start of input) |
+| `Ctrl+C` | Close session with confirmation (when detail panel is open) |
 | `↑` / `↓` | Navigate input history |
 | `Cmd+Shift+H` | Focus huge-mouse from any app (key configurable) |
 | `Escape` | Close popup / refocus textarea |
@@ -92,6 +95,10 @@ Press `Ctrl+N` to create a new session. A dialog lets you pick a target tmux ses
 
 Press `Ctrl+G` to open git operations for the selected pane's working directory. You can **Add All**, **Commit** (with a message), and **Push** directly from the popup. Shortcuts within the popup: `Ctrl+A` (add all), `Ctrl+P` (push).
 
+### Slash commands
+
+Save reusable text snippets as slash commands (e.g., `/fix`, `/review`). Type `/` at the start of the textarea to see a filterable autocomplete list. Select a command with `Enter`, `Tab`, or click to insert its body. Manage commands in the **Slash Commands** section of the sidebar.
+
 ### Settings
 
 Click the gear icon to access settings:
@@ -108,6 +115,7 @@ Click the gear icon to access settings:
 - **Detail Key** — change the key for session detail popup (`Ctrl+<key>`)
 - **Git Key** — change the key for git operations popup (`Ctrl+<key>`)
 - **Focus Key** — change the global shortcut to focus huge-mouse (`Cmd+Shift+<key>`)
+- **Slash Commands** — add, edit, and delete reusable slash commands
 
 ## License
 

@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 
+interface SlashCommand {
+  name: string
+  body: string
+}
+
+interface SkillCommand {
+  name: string
+  body: string
+  source: 'skill-user' | 'skill-project'
+}
+
 interface TmuxChoice {
   number: string
   label: string
@@ -94,6 +105,120 @@ function App(): React.JSX.Element {
   const [history, setHistory] = useState<string[]>([])
   const historyIndex = useRef(-1)
   const savedDraft = useRef('')
+  const [slashCommands, setSlashCommands] = useState<SlashCommand[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('slashCommands') ?? '[]')
+    } catch {
+      return []
+    }
+  })
+  const [slashFilter, setSlashFilter] = useState<string | null>(null)
+  const [slashIndex, setSlashIndex] = useState(0)
+  const [editingSlash, setEditingSlash] = useState<SlashCommand | null>(null)
+  const [newSlashName, setNewSlashName] = useState('')
+  const [newSlashBody, setNewSlashBody] = useState('')
+  const [slashManagerOpen, setSlashManagerOpen] = useState(false)
+  const [skillCommands, setSkillCommands] = useState<SkillCommand[]>([])
+  // cwd of the currently selected pane — used to scope project-level skills
+  const [selectedCwd, setSelectedCwd] = useState('')
+  // in-memory cache of project skills per cwd: { skills, time }
+  const projectSkillCache = useRef<Map<string, { skills: SkillCommand[]; time: number }>>(new Map())
+
+  // All commands available for autocomplete: user-created commands, then skills
+  // User-created commands take priority if names collide
+  const allCommands = [
+    ...slashCommands,
+    ...skillCommands.filter((sk) => !slashCommands.some((uc) => uc.name === sk.name))
+  ]
+
+  const filteredSlash =
+    slashFilter !== null
+      ? allCommands.filter((c) => c.name.toLowerCase().startsWith(slashFilter.toLowerCase()))
+      : []
+
+  const saveSlashCommands = useCallback((cmds: SlashCommand[]) => {
+    setSlashCommands(cmds)
+    localStorage.setItem('slashCommands', JSON.stringify(cmds))
+  }, [])
+
+  const loadUserSkills = useCallback(async (force = false) => {
+    const USER_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+    const cachedTime = Number(localStorage.getItem('userSkillsCacheTime') ?? '0')
+    const now = Date.now()
+    if (!force && now - cachedTime < USER_CACHE_TTL) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('userSkillsCache') ?? '[]') as SkillCommand[]
+        if (cached.length > 0) {
+          setSkillCommands((prev) => {
+            const projectSkills = prev.filter((s) => s.source === 'skill-project')
+            return [...cached, ...projectSkills]
+          })
+          return
+        }
+      } catch {
+        // Fall through to re-fetch
+      }
+    }
+    const result = await window.api.listSkills('')
+    const userSkills: SkillCommand[] = result.user.map((s) => ({
+      name: s.name,
+      body: s.description || s.name,
+      source: 'skill-user'
+    }))
+    localStorage.setItem('userSkillsCache', JSON.stringify(userSkills))
+    localStorage.setItem('userSkillsCacheTime', String(now))
+    setSkillCommands((prev) => {
+      const projectSkills = prev.filter((s) => s.source === 'skill-project')
+      return [...userSkills, ...projectSkills]
+    })
+  }, [])
+
+  const loadProjectSkills = useCallback(async (cwd: string, force = false) => {
+    if (!cwd) return
+    const PROJECT_CACHE_TTL = 30 * 1000 // 30 seconds
+    const cached = projectSkillCache.current.get(cwd)
+    if (!force && cached && Date.now() - cached.time < PROJECT_CACHE_TTL) {
+      setSkillCommands((prev) => {
+        const userSkills = prev.filter((s) => s.source === 'skill-user')
+        return [...userSkills, ...cached.skills]
+      })
+      return
+    }
+    const result = await window.api.listSkills(cwd)
+    const projectSkills: SkillCommand[] = result.project.map((s) => ({
+      name: s.name,
+      body: s.description || s.name,
+      source: 'skill-project'
+    }))
+    projectSkillCache.current.set(cwd, { skills: projectSkills, time: Date.now() })
+    setSkillCommands((prev) => {
+      const userSkills = prev.filter((s) => s.source === 'skill-user')
+      return [...userSkills, ...projectSkills]
+    })
+  }, [])
+
+  // Load user-level skills on mount, refresh every 5 minutes
+  useEffect(() => {
+    loadUserSkills()
+    const id = setInterval(() => loadUserSkills(true), 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [loadUserSkills])
+
+  // Load project-level skills when selected pane cwd changes, refresh every 30s
+  useEffect(() => {
+    if (!selected) return
+    window.api.getPaneDetail(selected).then((detail) => {
+      if (!detail?.cwd) return
+      setSelectedCwd(detail.cwd)
+      loadProjectSkills(detail.cwd)
+    })
+  }, [selected, loadProjectSkills])
+
+  useEffect(() => {
+    if (!selectedCwd) return
+    const id = setInterval(() => loadProjectSkills(selectedCwd, true), 30 * 1000)
+    return () => clearInterval(id)
+  }, [selectedCwd, loadProjectSkills])
 
   useEffect(() => {
     window.api.getAlwaysOnTop().then(setAlwaysOnTop)
@@ -374,9 +499,60 @@ function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
   }, [selected, panes, choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup, createDialog, confirmKill])
 
+  const applySlashCommand = useCallback(
+    (cmd: SlashCommand) => {
+      setText(cmd.body)
+      setSlashFilter(null)
+      setSlashIndex(0)
+      requestAnimationFrame(() => textareaRef.current?.focus())
+    },
+    []
+  )
+
+  const handleTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value
+      setText(val)
+      // Detect slash command trigger: starts with / and no spaces yet
+      const match = val.match(/^\/(\S*)$/)
+      if (match && allCommands.length > 0) {
+        setSlashFilter(match[1])
+        setSlashIndex(0)
+      } else {
+        setSlashFilter(null)
+      }
+    },
+    [allCommands]
+  )
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.nativeEvent.isComposing) return
+
+      // Slash command menu navigation
+      if (slashFilter !== null && filteredSlash.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setSlashIndex((i) => (i + 1) % filteredSlash.length)
+          return
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setSlashIndex((i) => (i - 1 + filteredSlash.length) % filteredSlash.length)
+          return
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault()
+          applySlashCommand(filteredSlash[slashIndex])
+          return
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setSlashFilter(null)
+          return
+        }
+      }
+
       if (e.key === 'Enter') {
         const isSend =
           sendKey === 'cmd+enter' ? e.metaKey : !e.metaKey && !e.shiftKey
@@ -428,7 +604,7 @@ function App(): React.JSX.Element {
         }
       }
     },
-    [send, sendKey, history, text]
+    [send, sendKey, history, text, slashFilter, filteredSlash, slashIndex, applySlashCommand]
   )
 
   const toggleAlwaysOnTop = async (): Promise<void> => {
@@ -560,15 +736,34 @@ function App(): React.JSX.Element {
             </div>
           )}
 
-          <textarea
-            ref={textareaRef}
-            className="textarea"
-            rows={5}
-            placeholder={`Type input to send... (${sendKey === 'cmd+enter' ? 'Cmd+Enter' : 'Enter'} to send)`}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
+          <div className="textarea-wrapper">
+            <textarea
+              ref={textareaRef}
+              className="textarea"
+              rows={5}
+              placeholder={`Type input to send... (${sendKey === 'cmd+enter' ? 'Cmd+Enter' : 'Enter'} to send)`}
+              value={text}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+            />
+            {slashFilter !== null && filteredSlash.length > 0 && (
+              <div className="slash-menu">
+                {filteredSlash.map((cmd, i) => (
+                  <button
+                    key={cmd.name}
+                    className={`slash-item ${i === slashIndex ? 'slash-item-active' : ''}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      applySlashCommand(cmd)
+                    }}
+                  >
+                    <span className="slash-item-name">/{cmd.name}</span>
+                    <span className="slash-item-body">{cmd.body.length > 40 ? cmd.body.slice(0, 40) + '...' : cmd.body}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="footer">
             {status && (
@@ -833,6 +1028,135 @@ function App(): React.JSX.Element {
               </button>
             )}
           </label>
+
+          <div className="sidebar-divider" />
+          <div
+            className="setting-row"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setSlashManagerOpen(!slashManagerOpen)}
+          >
+            <span className="setting-label">Slash Commands ({allCommands.length})</span>
+            <span className="slash-toggle-arrow">{slashManagerOpen ? '▾' : '▸'}</span>
+          </div>
+          {slashManagerOpen && (
+            <div className="slash-manager">
+              {skillCommands.length > 0 && (
+                <div className="slash-skill-section">
+                  <span className="slash-skill-label">Skills (read-only)</span>
+                  {skillCommands.map((cmd) => (
+                    <div key={`skill:${cmd.name}`} className="slash-entry slash-entry-skill">
+                      <span className="slash-entry-name">/{cmd.name}</span>
+                      <span className="slash-skill-source">
+                        {cmd.source === 'skill-user' ? 'user' : 'project'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {slashCommands.map((cmd) => (
+                <div key={cmd.name} className="slash-entry">
+                  {editingSlash?.name === cmd.name ? (
+                    <div className="slash-edit-form">
+                      <input
+                        className="slash-input"
+                        value={editingSlash.name}
+                        onChange={(e) =>
+                          setEditingSlash({ ...editingSlash, name: e.target.value })
+                        }
+                        onKeyDown={(e) => e.stopPropagation()}
+                        placeholder="name"
+                      />
+                      <textarea
+                        className="slash-body-input"
+                        value={editingSlash.body}
+                        onChange={(e) =>
+                          setEditingSlash({ ...editingSlash, body: e.target.value })
+                        }
+                        onKeyDown={(e) => e.stopPropagation()}
+                        placeholder="body"
+                        rows={2}
+                      />
+                      <div className="slash-edit-actions">
+                        <button
+                          className="slash-save-btn"
+                          onClick={() => {
+                            if (!editingSlash.name.trim() || !editingSlash.body.trim()) return
+                            saveSlashCommands(
+                              slashCommands.map((c) =>
+                                c.name === cmd.name
+                                  ? { name: editingSlash.name.trim(), body: editingSlash.body.trim() }
+                                  : c
+                              )
+                            )
+                            setEditingSlash(null)
+                          }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="slash-cancel-btn"
+                          onClick={() => setEditingSlash(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="slash-entry-name">/{cmd.name}</span>
+                      <div className="slash-entry-actions">
+                        <button
+                          className="slash-action-btn"
+                          onClick={() => setEditingSlash({ ...cmd })}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="slash-action-btn slash-delete-btn"
+                          onClick={() =>
+                            saveSlashCommands(slashCommands.filter((c) => c.name !== cmd.name))
+                          }
+                        >
+                          Del
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              <div className="slash-add-form">
+                <input
+                  className="slash-input"
+                  value={newSlashName}
+                  onChange={(e) => setNewSlashName(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="/name"
+                />
+                <textarea
+                  className="slash-body-input"
+                  value={newSlashBody}
+                  onChange={(e) => setNewSlashBody(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="Command body..."
+                  rows={2}
+                />
+                <button
+                  className="slash-save-btn"
+                  disabled={!newSlashName.trim() || !newSlashBody.trim()}
+                  onClick={() => {
+                    const name = newSlashName.trim().replace(/^\//, '')
+                    if (!name || !newSlashBody.trim()) return
+                    if (slashCommands.some((c) => c.name === name)) return
+                    saveSlashCommands([...slashCommands, { name, body: newSlashBody.trim() }])
+                    setNewSlashName('')
+                    setNewSlashBody('')
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>}
 
@@ -1003,6 +1327,154 @@ function App(): React.JSX.Element {
                   <pre className="detail-value detail-git-status">{paneDetail.gitStatus}</pre>
                 </>
               )}
+              <div className="detail-actions">
+                <button
+                  className="git-btn detail-kill-btn"
+                  onClick={() => setConfirmKill(true)}
+                >
+                  Close Session
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createDialog && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => {
+            if (el && !el.dataset.focused) {
+              el.focus()
+              el.dataset.focused = 'true'
+            }
+          }}
+          onClick={() => { setCreateDialog(false); requestAnimationFrame(() => textareaRef.current?.focus()) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setCreateDialog(false)
+              requestAnimationFrame(() => textareaRef.current?.focus())
+              e.preventDefault()
+            }
+          }}
+        >
+          <div className="pane-popup detail-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">New Session</span>
+              <button className="pane-popup-close" onClick={() => { setCreateDialog(false); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
+                Esc
+              </button>
+            </div>
+            <div className="create-session-form">
+              <label className="setting-row">
+                <span className="setting-label">Session</span>
+                <select
+                  className="create-session-select"
+                  value={newSessionTarget}
+                  onChange={(e) => setNewSessionTarget(e.target.value)}
+                >
+                  {tmuxSessions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="setting-row">
+                <span className="setting-label">Command</span>
+                <div className="theme-segment">
+                  <button
+                    className={`theme-btn ${newSessionCommand === 'claude' ? 'theme-btn-active' : ''}`}
+                    onClick={() => setNewSessionCommand('claude')}
+                  >
+                    claude
+                  </button>
+                  <button
+                    className={`theme-btn ${newSessionCommand === 'codex' ? 'theme-btn-active' : ''}`}
+                    onClick={() => setNewSessionCommand('codex')}
+                  >
+                    codex
+                  </button>
+                </div>
+              </label>
+              <button
+                className="git-btn create-session-btn"
+                disabled={!newSessionTarget}
+                onClick={async () => {
+                  const r = await window.api.createSession(newSessionTarget, newSessionCommand)
+                  if (r.success) {
+                    setCreateDialog(false)
+                    setStatus({ message: `Created ${newSessionCommand} in ${newSessionTarget}`, ok: true })
+                    const result = await window.api.listSessions()
+                    setPanes(result)
+                  } else {
+                    setStatus({ message: r.error ?? 'Failed', ok: false })
+                  }
+                  setTimeout(() => setStatus(null), 2000)
+                  requestAnimationFrame(() => textareaRef.current?.focus())
+                }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmKill && paneDetail && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => {
+            if (el && !el.dataset.focused) {
+              el.focus()
+              el.dataset.focused = 'true'
+            }
+          }}
+          onClick={() => setConfirmKill(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setConfirmKill(false)
+              e.preventDefault()
+            }
+          }}
+        >
+          <div className="pane-popup detail-popup confirm-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">Confirm Close</span>
+            </div>
+            <div className="confirm-body">
+              <p>Close session <strong>{paneDetail.target}</strong> ({paneDetail.command})?</p>
+              <div className="confirm-actions">
+                <button
+                  className="git-btn"
+                  onClick={() => setConfirmKill(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="git-btn detail-kill-btn"
+                  onClick={async () => {
+                    const r = await window.api.killPane(paneDetail.target)
+                    setConfirmKill(false)
+                    setPaneDetail(null)
+                    if (r.success) {
+                      setStatus({ message: `Closed ${paneDetail.target}`, ok: true })
+                      if (selected === paneDetail.target) setSelected('')
+                      const result = await window.api.listSessions()
+                      setPanes(result)
+                      if (result.length > 0 && !result.find((p) => p.target === selected)) {
+                        setSelected(result[0].target)
+                      }
+                    } else {
+                      setStatus({ message: r.error ?? 'Failed', ok: false })
+                    }
+                    setTimeout(() => setStatus(null), 2000)
+                    requestAnimationFrame(() => textareaRef.current?.focus())
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

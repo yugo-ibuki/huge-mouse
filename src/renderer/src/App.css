@@ -896,6 +896,337 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+/* ── Textarea wrapper (for slash menu positioning) ── */
+.textarea-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.textarea-wrapper .textarea {
+  flex: 1;
+}
+
+/* ── Slash command menu ── */
+.slash-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 2px;
+}
+
+.slash-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.slash-item:hover,
+.slash-item-active {
+  background: var(--accent-muted);
+}
+
+.slash-item-active {
+  border-left: 2px solid var(--accent);
+}
+
+.slash-item-name {
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.slash-item-body {
+  color: var(--text-dim);
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Slash command manager (sidebar) ── */
+.sidebar-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 8px 0;
+}
+
+.slash-toggle-arrow {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.slash-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.slash-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 3px 0;
+}
+
+.slash-entry-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-entry-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.slash-action-btn {
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-size: 8px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.slash-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.slash-delete-btn:hover {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.slash-edit-form,
+.slash-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.slash-input {
+  padding: 3px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.slash-input:focus {
+  border-color: var(--accent);
+}
+
+.slash-input::placeholder {
+  color: var(--text-dim);
+}
+
+.slash-body-input {
+  padding: 3px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  outline: none;
+  resize: vertical;
+  min-height: 30px;
+  transition: border-color var(--transition);
+}
+
+.slash-body-input:focus {
+  border-color: var(--accent);
+}
+
+.slash-body-input::placeholder {
+  color: var(--text-dim);
+}
+
+.slash-edit-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.slash-save-btn {
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--accent);
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: 8px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.slash-save-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.slash-save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.slash-cancel-btn {
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-size: 8px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.slash-cancel-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* ── Skill commands (read-only) in slash manager ── */
+.slash-skill-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.slash-skill-label {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+.slash-entry-skill {
+  opacity: 0.75;
+}
+
+.slash-skill-source {
+  font-size: 8px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 1px 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Create session dialog */
+.create-session-form {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 10px;
+}
+
+.create-session-select {
+  background: var(--bg-surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: var(--font-size);
+}
+
+.create-session-btn {
+  align-self: flex-end;
+  padding: 6px 20px;
+}
+
+/* Detail panel kill button */
+.detail-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.detail-kill-btn {
+  background: #c53030;
+}
+
+.detail-kill-btn:hover {
+  background: #e53e3e;
+}
+
+/* Confirm kill dialog */
+.confirm-popup {
+  max-width: 320px;
+}
+
+.confirm-body {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  text-align: center;
+}
+
+.confirm-body p {
+  margin: 0 0 12px;
+  color: var(--fg);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
 /* ── Last Claude response highlight ── */
 .last-response {
   background: var(--accent-muted);

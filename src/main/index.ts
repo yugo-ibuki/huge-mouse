@@ -1,7 +1,49 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import { join } from 'path'
+import { homedir } from 'os'
+import { readdir, readFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush, listTmuxSessions, createSession, killPane } from './tmux'
+
+interface SkillEntry {
+  name: string
+  description: string
+}
+
+// Parse YAML frontmatter block (---\n...\n---) from a markdown file
+function parseFrontmatter(content: string): Record<string, string> {
+  const match = content.match(/^---\n([\s\S]*?)\n---/)
+  if (!match) return {}
+  const result: Record<string, string> = {}
+  for (const line of match[1].split('\n')) {
+    const colonIdx = line.indexOf(':')
+    if (colonIdx > 0) {
+      result[line.slice(0, colonIdx).trim()] = line.slice(colonIdx + 1).trim()
+    }
+  }
+  return result
+}
+
+async function listSkillsFromDir(baseDir: string): Promise<SkillEntry[]> {
+  try {
+    const skillsDir = join(baseDir, '.claude', 'skills')
+    const entries = await readdir(skillsDir, { withFileTypes: true })
+    const skills: SkillEntry[] = []
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      try {
+        const content = await readFile(join(skillsDir, entry.name, 'SKILL.md'), 'utf-8')
+        const fm = parseFrontmatter(content)
+        if (fm.name) skills.push({ name: fm.name, description: fm.description ?? '' })
+      } catch {
+        // Skip unreadable SKILL.md files
+      }
+    }
+    return skills
+  } catch {
+    return []
+  }
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -67,6 +109,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tmux:kill-pane', async (_event, target: string) => {
     return killPane(target)
+  })
+
+  ipcMain.handle('skills:list', async (_event, cwd: string) => {
+    const [user, project] = await Promise.all([
+      listSkillsFromDir(homedir()),
+      cwd ? listSkillsFromDir(cwd) : Promise.resolve([])
+    ])
+    return { user, project }
   })
 
   ipcMain.handle('git:add', async (_event, cwd: string) => gitAdd(cwd))

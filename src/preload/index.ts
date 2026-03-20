@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+export interface SkillEntry {
+  name: string
+  description: string
+}
+
 export interface TmuxPane {
   target: string
   pid: string
@@ -36,6 +41,8 @@ const api = {
     ipcRenderer.invoke('tmux:capture-pane', target),
   getPaneDetail: (target: string): Promise<PaneDetail | null> =>
     ipcRenderer.invoke('tmux:pane-detail', target),
+  listSkills: (cwd: string): Promise<{ user: SkillEntry[]; project: SkillEntry[] }> =>
+    ipcRenderer.invoke('skills:list', cwd),
   listTmuxSessions: (): Promise<string[]> => ipcRenderer.invoke('tmux:list-tmux-sessions'),
   createSession: (sessionName: string, command: 'claude' | 'codex'): Promise<SendResult> =>
     ipcRenderer.invoke('tmux:create-session', { sessionName, command }),
