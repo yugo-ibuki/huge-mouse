@@ -32,8 +32,6 @@ const tmuxBin = findBin(TMUX_PATHS, 'tmux')
 const gitBin = findBin(GIT_PATHS, 'git')
 
 function getTmuxSocketPath(): string | undefined {
-  // When launched from Finder, TMUX env var is not inherited.
-  // Try common default socket paths.
   const candidates = [
     process.env['TMUX']?.split(',')[0],
     `/private/tmp/tmux-${process.getuid?.() ?? 0}/default`
@@ -49,16 +47,20 @@ function run(args: string[]): Promise<string> {
   const fullArgs = socketPath ? ['-S', socketPath, ...args] : args
 
   return new Promise((resolve, reject) => {
-    execFile(tmuxBin, fullArgs, { timeout: 5000, env: { ...process.env, LANG: 'en_US.UTF-8' } }, (error, stdout, stderr) => {
-      if (error) {
-        console.error('[tmux]', error.message, stderr)
-        return reject(error)
+    execFile(
+      tmuxBin,
+      fullArgs,
+      { timeout: 5000, env: { ...process.env, LANG: 'en_US.UTF-8' } },
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error('[tmux]', error.message, stderr)
+          return reject(error)
+        }
+        resolve(stdout)
       }
-      resolve(stdout)
-    })
+    )
   })
 }
-
 
 function runGit(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -67,42 +69,6 @@ function runGit(args: string[]): Promise<string> {
       resolve(stdout)
     })
   })
-}
-
-const MODEL_PATTERNS = [
-  /claude-opus[^\s]*/i,
-  /claude-sonnet[^\s]*/i,
-  /claude-haiku[^\s]*/i,
-  /claude-\d[^\s]*/i,
-  /\b(opus|sonnet|haiku)\s+[\d.]+/i,
-  /model:\s*([^\s,]+)/i,
-  /\bgpt-[^\s]*/i,
-  /\bo[13]-[^\s]*/i,
-  /\bcodex-[^\s]*/i
-]
-
-function parseModel(content: string): string {
-  const lines = content.split('\n')
-  for (const line of lines) {
-    for (const pattern of MODEL_PATTERNS) {
-      const match = line.match(pattern)
-      if (match) return match[0].trim()
-    }
-  }
-  return ''
-}
-
-function parseSessionId(content: string): string {
-  const lines = content.split('\n')
-  for (const line of lines) {
-    // "session: abc123..." or "Session ID: abc123..."
-    const idMatch = line.match(/[Ss]ession(?:\s*ID)?[:\s]+([a-f0-9-]{8,})/)
-    if (idMatch) return idMatch[1]
-    // standalone UUID pattern near "session" context
-    const uuidMatch = line.match(/\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b/)
-    if (uuidMatch) return uuidMatch[1]
-  }
-  return ''
 }
 
 const WAITING_PATTERNS = [
@@ -121,9 +87,6 @@ async function capturePaneContent(target: string): Promise<string> {
   }
 }
 
-// First choice line has a prompt marker (❯›>☞), e.g. " ❯ 1. Yes"
-// Subsequent choices have only spaces before the number, e.g. "  2. No"
-// We detect the marker line first, then collect following numbered lines as part of the same choice group.
 const MARKER_CHOICE_PATTERN = /^\s*[❯›>☞]\s*(\d+)[.)]\s+(.+)$/
 const PLAIN_CHOICE_PATTERN = /^\s+(\d+)[.)]\s+(.+)$/
 
@@ -143,10 +106,8 @@ function parseChoices(content: string): TmuxChoice[] {
       if (plainMatch) {
         choices.push({ number: plainMatch[1], label: plainMatch[2].trim() })
       } else if (line.trim() === '' || /^\s+\S/.test(line)) {
-        // Allow blank lines and continuation lines (multi-line labels) within choice block
         continue
       } else {
-        // Non-matching line ends the choice block
         inChoiceBlock = false
       }
     }
@@ -156,7 +117,6 @@ function parseChoices(content: string): TmuxChoice[] {
 
 function parsePrompt(content: string): string {
   const lines = content.split('\n')
-  // Walk backwards from end, skip choice lines and hints, collect prompt text
   const promptLines: string[] = []
   let pastChoices = false
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -165,7 +125,11 @@ function parsePrompt(content: string): string {
       if (pastChoices) break
       continue
     }
-    if (MARKER_CHOICE_PATTERN.test(line) || PLAIN_CHOICE_PATTERN.test(line) || /^Esc to cancel/.test(line)) {
+    if (
+      MARKER_CHOICE_PATTERN.test(line) ||
+      PLAIN_CHOICE_PATTERN.test(line) ||
+      /^Esc to cancel/.test(line)
+    ) {
       pastChoices = true
       continue
     }
@@ -177,22 +141,20 @@ function parsePrompt(content: string): string {
   return promptLines.join('\n').trim()
 }
 
-// Codex displays "-ing" words during processing: Working, Thinking, Reconnecting, etc.
-// These typically appear with "esc to interrupt" nearby.
 const CODEX_BUSY_PATTERNS = [
   /\b(?:Working|Thinking|Reconnecting|Connecting|Executing)\b/,
   /esc to interrupt/i
 ]
 
-// Codex footer hint when idle: "Enter to send", "Ctrl+J" / "newline", "quit" etc.
-// The Rust TUI may show these on separate lines or in different formats,
-// so check for any of them individually rather than requiring all on one line.
-const CODEX_IDLE_INDICATORS = [
-  /enter\s+to\s+send/i,
-  /\bsend\b.*\bnewline\b.*\bquit\b/ // legacy format (backward compat)
-]
+const CODEX_IDLE_INDICATORS = [/enter\s+to\s+send/i, /\bsend\b.*\bnewline\b.*\bquit\b/]
 
-function detectStatusClaude(title: string, content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+const CODEX_OPTION_PATTERN = /^\s+-\s+\S/
+const CODEX_QUESTION_PATTERN = /^\s+-\s+.+\?/
+
+function detectStatusClaude(
+  title: string,
+  content: string
+): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
   if (!title.includes('✳')) return { status: 'busy', choices: [], prompt: '' }
 
   const choices = parseChoices(content)
@@ -210,22 +172,17 @@ function detectStatusClaude(title: string, content: string): { status: PaneStatu
   return { status: 'idle', choices: [], prompt: '' }
 }
 
-// Codex presents options as indented "- " list items
-const CODEX_OPTION_PATTERN = /^\s+-\s+\S/
-// "- ...?" is a definitive question/choice indicator
-const CODEX_QUESTION_PATTERN = /^\s+-\s+.+\?/
-
-function detectStatusCodex(content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+function detectStatusCodex(
+  content: string
+): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
   const lines = content.split('\n').slice(-15)
   const tail = lines.join('\n')
 
-  // 1. Check for explicit busy signals (-ing words or "esc to interrupt")
   const isBusy = CODEX_BUSY_PATTERNS.some((p) => p.test(tail))
   if (isBusy) {
     return { status: 'busy', choices: [], prompt: '' }
   }
 
-  // 2. Check for explicit idle signals (footer hints)
   const isIdle = CODEX_IDLE_INDICATORS.some((p) => p.test(tail))
   if (isIdle) {
     const hasQuestion = lines.some((line) => CODEX_QUESTION_PATTERN.test(line))
@@ -236,19 +193,21 @@ function detectStatusCodex(content: string): { status: PaneStatus; choices: Tmux
     return { status: 'idle', choices: [], prompt: '' }
   }
 
-  // 3. No busy signal detected → default to idle (not busy).
-  // If Codex is NOT showing "Working"/"Thinking"/etc,
-  // it is most likely at the input prompt waiting for user input.
   return { status: 'idle', choices: [], prompt: '' }
 }
 
-function detectStatus(title: string, content: string, command: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+function detectStatus(
+  title: string,
+  content: string,
+  command: string
+): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
   if (command === 'codex') return detectStatusCodex(content)
   return detectStatusClaude(title, content)
 }
 
 export async function listPanes(): Promise<TmuxPane[]> {
-  const format = '#{session_name}:#{window_index}.#{pane_index}|#{pane_pid}|#{pane_current_command}|#{pane_title}'
+  const format =
+    '#{session_name}:#{window_index}.#{pane_index}|#{pane_pid}|#{pane_current_command}|#{pane_title}'
   const stdout = await run(['list-panes', '-a', '-F', format])
 
   const panes = stdout
@@ -257,21 +216,23 @@ export async function listPanes(): Promise<TmuxPane[]> {
     .filter((line) => line.length > 0)
     .map((line) => {
       const [target, pid, command, title] = line.split('|')
-      return { target, pid, command, title, status: 'busy' as PaneStatus, choices: [] as TmuxChoice[], prompt: '' }
+      return {
+        target,
+        pid,
+        command,
+        title,
+        status: 'busy' as PaneStatus,
+        choices: [] as TmuxChoice[],
+        prompt: ''
+      }
     })
-    // Support popular wrappers like `ai` in addition to `claude` and `codex`.
-    // Also check pane_title as a fallback — when codex spawns subprocesses,
-    // pane_current_command may change to `node` while the title still contains `codex`.
     .filter((pane) => {
       if (/^(claude|codex|ai)(\b|-)/i.test(pane.command)) {
-        // Normalize variant names like `codex-aarch64-a` to `codex`
         if (/^codex/i.test(pane.command)) pane.command = 'codex'
         else if (/^claude/i.test(pane.command)) pane.command = 'claude'
         return true
       }
       if (/\b(claude|codex)\b/i.test(pane.title)) {
-        // pane_current_command changed to a subprocess (e.g. node).
-        // Normalize command so detectStatus routes correctly.
         const titleLower = pane.title.toLowerCase()
         if (titleLower.includes('codex')) pane.command = 'codex'
         else if (titleLower.includes('claude')) pane.command = 'claude'
@@ -305,17 +266,18 @@ export async function sendInput(
   }
 
   try {
-    // Detect if the pane is showing choices (waiting state).
-    // When choices are visible and input is a single digit (1-9),
-    // skip insert mode switch since choices work in normal mode.
     const content = await capturePane(target)
-    const titleAndCmd = await run(['display-message', '-t', target, '-p', '#{pane_title}|#{pane_current_command}'])
+    const titleAndCmd = await run([
+      'display-message',
+      '-t',
+      target,
+      '-p',
+      '#{pane_title}|#{pane_current_command}'
+    ])
     const [title, command] = titleAndCmd.trim().split('|')
     const { status } = detectStatus(title, content, command)
     const isChoiceResponse = status === 'waiting' && /^[1-9]$/.test(text)
 
-    // Only send Escape+i when Claude CLI is in vim input mode.
-    // In native (readline) mode, Escape+i would type a literal "i".
     if (!isChoiceResponse && vimMode) {
       await run(['send-keys', '-t', target, 'Escape'])
       await new Promise((r) => setTimeout(r, 50))
@@ -327,12 +289,9 @@ export async function sendInput(
     const hasNewlines = text.includes('\n')
 
     if (isCodex) {
-      // Codex ignores Enter from external tmux clients. Use run-shell
-      // to execute send-keys from within the tmux server process itself.
       await run(['send-keys', '-t', target, '-l', text])
       await run(['run-shell', `${tmuxBin} send-keys -t ${target} Enter`])
     } else if (hasNewlines) {
-      // Send bracketed paste escape sequences to preserve newlines
       const trimmed = text.replace(/\n+$/, '')
       await run(['send-keys', '-t', target, '\x1b[200~'])
       await run(['send-keys', '-t', target, '-l', trimmed])
@@ -363,6 +322,42 @@ export interface PaneDetail {
   gitStatus: string
   model: string
   sessionId: string
+}
+
+const MODEL_PATTERNS = [
+  /claude-opus[^\s]*/i,
+  /claude-sonnet[^\s]*/i,
+  /claude-haiku[^\s]*/i,
+  /claude-\d[^\s]*/i,
+  /\b(opus|sonnet|haiku)\s+[\d.]+/i,
+  /model:\s*([^\s,]+)/i,
+  /\bgpt-[^\s]*/i,
+  /\bo[13]-[^\s]*/i,
+  /\bcodex-[^\s]*/i
+]
+
+function parseModel(content: string): string {
+  const lines = content.split('\n')
+  for (const line of lines) {
+    for (const pattern of MODEL_PATTERNS) {
+      const match = line.match(pattern)
+      if (match) return match[0].trim()
+    }
+  }
+  return ''
+}
+
+function parseSessionId(content: string): string {
+  const lines = content.split('\n')
+  for (const line of lines) {
+    const idMatch = line.match(/[Ss]ession(?:\s*ID)?[:\s]+([a-f0-9-]{8,})/)
+    if (idMatch) return idMatch[1]
+    const uuidMatch = line.match(
+      /\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b/
+    )
+    if (uuidMatch) return uuidMatch[1]
+  }
+  return ''
 }
 
 export async function getPaneDetail(target: string): Promise<PaneDetail | null> {
@@ -436,42 +431,6 @@ export async function gitCommit(
 export async function gitPush(cwd: string): Promise<{ success: boolean; error?: string }> {
   try {
     await runGit(['-C', cwd, 'push'])
-    return { success: true }
-  } catch (e) {
-    return { success: false, error: String(e) }
-  }
-}
-
-export async function listTmuxSessions(): Promise<string[]> {
-  try {
-    const stdout = await run(['list-sessions', '-F', '#{session_name}'])
-    return stdout
-      .trim()
-      .split('\n')
-      .filter((s) => s.length > 0)
-  } catch {
-    return []
-  }
-}
-
-export async function createSession(
-  sessionName: string,
-  command: 'claude' | 'codex'
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    await run(['new-window', '-t', sessionName, command])
-    return { success: true }
-  } catch (e) {
-    return { success: false, error: String(e) }
-  }
-}
-
-export async function killPane(target: string): Promise<{ success: boolean; error?: string }> {
-  if (!TARGET_PATTERN.test(target)) {
-    return { success: false, error: 'Invalid target format' }
-  }
-  try {
-    await run(['kill-pane', '-t', target])
     return { success: true }
   } catch (e) {
     return { success: false, error: String(e) }
