@@ -94,6 +94,11 @@ function App(): React.JSX.Element {
   const [commitMsg, setCommitMsg] = useState('')
   const [gitResult, setGitResult] = useState<{ message: string; ok: boolean } | null>(null)
   const [gitPopup, setGitPopup] = useState<PaneDetail | null>(null)
+  const [createDialog, setCreateDialog] = useState(false)
+  const [tmuxSessions, setTmuxSessions] = useState<string[]>([])
+  const [newSessionTarget, setNewSessionTarget] = useState('')
+  const [newSessionCommand, setNewSessionCommand] = useState<'claude' | 'codex'>('claude')
+  const [confirmKill, setConfirmKill] = useState(false)
   const detailContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const paneViewerRef = useRef<HTMLPreElement>(null)
@@ -310,6 +315,35 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
+      // Ctrl+Cmd+H/L → jump across session boundaries
+      const isPrevSession = e.ctrlKey && e.metaKey && e.key === 'h'
+      const isNextSession = e.ctrlKey && e.metaKey && e.key === 'l'
+      if (isPrevSession || isNextSession) {
+        e.preventDefault()
+        setPanes((prev) => {
+          if (prev.length === 0) return prev
+          const sessionNames: string[] = []
+          const sessionFirstIdx: number[] = []
+          for (let i = 0; i < prev.length; i++) {
+            const sess = prev[i].target.split(':')[0]
+            if (sessionNames[sessionNames.length - 1] !== sess) {
+              sessionNames.push(sess)
+              sessionFirstIdx.push(i)
+            }
+          }
+          const currentSess = selected ? selected.split(':')[0] : ''
+          const currentSessionIdx = sessionNames.indexOf(currentSess)
+          let nextSessionIdx: number
+          if (isPrevSession) {
+            nextSessionIdx = currentSessionIdx > 0 ? currentSessionIdx - 1 : sessionNames.length - 1
+          } else {
+            nextSessionIdx = currentSessionIdx < sessionNames.length - 1 ? currentSessionIdx + 1 : 0
+          }
+          setSelected(prev[sessionFirstIdx[nextSessionIdx]].target)
+          return prev
+        })
+      }
+
       const isPrevPane = (e.metaKey && e.key === 'ArrowUp') || (e.ctrlKey && e.key === 'h' && !e.metaKey)
       const isNextPane = (e.metaKey && e.key === 'ArrowDown') || (e.ctrlKey && e.key === 'l' && !e.metaKey)
       if (isPrevPane) {
@@ -418,8 +452,36 @@ function App(): React.JSX.Element {
         }
       }
 
+      // Ctrl+N → open create session dialog
+      if (e.ctrlKey && e.key === 'n' && !e.metaKey) {
+        e.preventDefault()
+        window.api.listTmuxSessions().then((sessions) => {
+          setTmuxSessions(sessions)
+          setNewSessionTarget(sessions[0] ?? '')
+          setNewSessionCommand('claude')
+          setCreateDialog(true)
+        })
+      }
+
+      // Ctrl+C → confirm kill when detail panel is open
+      if (e.ctrlKey && e.key === 'c' && !e.metaKey && paneDetail !== null) {
+        e.preventDefault()
+        setConfirmKill(true)
+      }
+
       // Escape → close popups and refocus textarea
       if (e.key === 'Escape') {
+        if (confirmKill) {
+          e.preventDefault()
+          setConfirmKill(false)
+          return
+        }
+        if (createDialog) {
+          e.preventDefault()
+          setCreateDialog(false)
+          requestAnimationFrame(() => textareaRef.current?.focus())
+          return
+        }
         if (paneContent !== null) {
           e.preventDefault()
           setPaneContent(null)
@@ -437,7 +499,7 @@ function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [selected, panes, choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup])
+  }, [selected, panes, choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup, createDialog, confirmKill])
 
   const applySlashCommand = useCallback(
     (cmd: SlashCommand) => {
@@ -1259,6 +1321,154 @@ function App(): React.JSX.Element {
                   <pre className="detail-value detail-git-status">{paneDetail.gitStatus}</pre>
                 </>
               )}
+              <div className="detail-actions">
+                <button
+                  className="git-btn detail-kill-btn"
+                  onClick={() => setConfirmKill(true)}
+                >
+                  Close Session
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createDialog && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => {
+            if (el && !el.dataset.focused) {
+              el.focus()
+              el.dataset.focused = 'true'
+            }
+          }}
+          onClick={() => { setCreateDialog(false); requestAnimationFrame(() => textareaRef.current?.focus()) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setCreateDialog(false)
+              requestAnimationFrame(() => textareaRef.current?.focus())
+              e.preventDefault()
+            }
+          }}
+        >
+          <div className="pane-popup detail-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">New Session</span>
+              <button className="pane-popup-close" onClick={() => { setCreateDialog(false); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
+                Esc
+              </button>
+            </div>
+            <div className="create-session-form">
+              <label className="setting-row">
+                <span className="setting-label">Session</span>
+                <select
+                  className="create-session-select"
+                  value={newSessionTarget}
+                  onChange={(e) => setNewSessionTarget(e.target.value)}
+                >
+                  {tmuxSessions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="setting-row">
+                <span className="setting-label">Command</span>
+                <div className="theme-segment">
+                  <button
+                    className={`theme-btn ${newSessionCommand === 'claude' ? 'theme-btn-active' : ''}`}
+                    onClick={() => setNewSessionCommand('claude')}
+                  >
+                    claude
+                  </button>
+                  <button
+                    className={`theme-btn ${newSessionCommand === 'codex' ? 'theme-btn-active' : ''}`}
+                    onClick={() => setNewSessionCommand('codex')}
+                  >
+                    codex
+                  </button>
+                </div>
+              </label>
+              <button
+                className="git-btn create-session-btn"
+                disabled={!newSessionTarget}
+                onClick={async () => {
+                  const r = await window.api.createSession(newSessionTarget, newSessionCommand)
+                  if (r.success) {
+                    setCreateDialog(false)
+                    setStatus({ message: `Created ${newSessionCommand} in ${newSessionTarget}`, ok: true })
+                    const result = await window.api.listSessions()
+                    setPanes(result)
+                  } else {
+                    setStatus({ message: r.error ?? 'Failed', ok: false })
+                  }
+                  setTimeout(() => setStatus(null), 2000)
+                  requestAnimationFrame(() => textareaRef.current?.focus())
+                }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmKill && paneDetail && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => {
+            if (el && !el.dataset.focused) {
+              el.focus()
+              el.dataset.focused = 'true'
+            }
+          }}
+          onClick={() => setConfirmKill(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setConfirmKill(false)
+              e.preventDefault()
+            }
+          }}
+        >
+          <div className="pane-popup detail-popup confirm-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">Confirm Close</span>
+            </div>
+            <div className="confirm-body">
+              <p>Close session <strong>{paneDetail.target}</strong> ({paneDetail.command})?</p>
+              <div className="confirm-actions">
+                <button
+                  className="git-btn"
+                  onClick={() => setConfirmKill(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="git-btn detail-kill-btn"
+                  onClick={async () => {
+                    const r = await window.api.killPane(paneDetail.target)
+                    setConfirmKill(false)
+                    setPaneDetail(null)
+                    if (r.success) {
+                      setStatus({ message: `Closed ${paneDetail.target}`, ok: true })
+                      if (selected === paneDetail.target) setSelected('')
+                      const result = await window.api.listSessions()
+                      setPanes(result)
+                      if (result.length > 0 && !result.find((p) => p.target === selected)) {
+                        setSelected(result[0].target)
+                      }
+                    } else {
+                      setStatus({ message: r.error ?? 'Failed', ok: false })
+                    }
+                    setTimeout(() => setStatus(null), 2000)
+                    requestAnimationFrame(() => textareaRef.current?.focus())
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

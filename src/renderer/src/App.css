@@ -1166,6 +1166,67 @@
   flex-shrink: 0;
 }
 
+/* Create session dialog */
+.create-session-form {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 10px;
+}
+
+.create-session-select {
+  background: var(--bg-surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: var(--font-size);
+}
+
+.create-session-btn {
+  align-self: flex-end;
+  padding: 6px 20px;
+}
+
+/* Detail panel kill button */
+.detail-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.detail-kill-btn {
+  background: #c53030;
+}
+
+.detail-kill-btn:hover {
+  background: #e53e3e;
+}
+
+/* Confirm kill dialog */
+.confirm-popup {
+  max-width: 320px;
+}
+
+.confirm-body {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  text-align: center;
+}
+
+.confirm-body p {
+  margin: 0 0 12px;
+  color: var(--fg);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
 /* ── Last Claude response highlight ── */
 .last-response {
   background: var(--accent-muted);

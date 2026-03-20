@@ -3,7 +3,7 @@ import { join } from 'path'
 import { homedir } from 'os'
 import { readdir, readFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush } from './tmux'
+import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush, listTmuxSessions, createSession, killPane } from './tmux'
 
 interface SkillEntry {
   name: string
@@ -93,6 +93,22 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tmux:pane-detail', async (_event, target: string) => {
     return getPaneDetail(target)
+  })
+
+  ipcMain.handle('tmux:list-tmux-sessions', async () => {
+    try {
+      return await listTmuxSessions()
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('tmux:create-session', async (_event, { sessionName, command }) => {
+    return createSession(sessionName, command)
+  })
+
+  ipcMain.handle('tmux:kill-pane', async (_event, target: string) => {
+    return killPane(target)
   })
 
   ipcMain.handle('skills:list', async (_event, cwd: string) => {
