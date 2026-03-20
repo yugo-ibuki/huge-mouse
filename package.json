@@ -1,6 +1,6 @@
 {
   "name": "huge-mouse",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Send input to tmux sessions from a floating desktop app",
   "main": "./out/main/index.js",
   "author": "yugo-ibuki",
