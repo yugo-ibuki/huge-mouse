@@ -36,6 +36,12 @@ interface SendResult {
   error?: string
 }
 
+interface SlashCommand {
+  name: string
+  description: string
+  source: 'user' | 'project'
+}
+
 interface TmuxAPI {
   listSessions: () => Promise<TmuxPane[]>
   sendInput: (target: string, text: string, vimMode?: boolean) => Promise<SendResult>
@@ -44,6 +50,7 @@ interface TmuxAPI {
   listTmuxSessions: () => Promise<string[]>
   createSession: (sessionName: string, command: 'claude' | 'codex') => Promise<SendResult>
   killPane: (target: string) => Promise<SendResult>
+  listCommands: (target: string) => Promise<SlashCommand[]>
   gitAdd: (cwd: string) => Promise<SendResult>
   gitCommit: (cwd: string, message: string) => Promise<SendResult>
   gitPush: (cwd: string) => Promise<SendResult>

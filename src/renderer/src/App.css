@@ -960,6 +960,83 @@
   color: var(--fg);
 }
 
+/* ── Slash command picker ── */
+.textarea-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.slash-picker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.slash-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size, 12px);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.slash-item:hover,
+.slash-item-active {
+  background: var(--bg-hover);
+}
+
+.slash-name {
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.slash-desc {
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.slash-badge-user {
+  color: var(--green);
+  background: rgba(52, 211, 153, 0.12);
+}
+
+.slash-badge-project {
+  color: var(--orange);
+  background: rgba(245, 158, 11, 0.12);
+}
+
 .confirm-actions {
   display: flex;
   gap: 8px;

@@ -28,6 +28,12 @@ export interface SendResult {
   error?: string
 }
 
+export interface SlashCommand {
+  name: string
+  description: string
+  source: 'user' | 'project'
+}
+
 const api = {
   listSessions: (): Promise<TmuxPane[]> => ipcRenderer.invoke('tmux:list-sessions'),
   sendInput: (target: string, text: string, vimMode = false): Promise<SendResult> =>
@@ -41,6 +47,8 @@ const api = {
     ipcRenderer.invoke('tmux:create-session', { sessionName, command }),
   killPane: (target: string): Promise<SendResult> =>
     ipcRenderer.invoke('tmux:kill-pane', target),
+  listCommands: (target: string): Promise<SlashCommand[]> =>
+    ipcRenderer.invoke('commands:list', target),
   gitAdd: (cwd: string): Promise<SendResult> => ipcRenderer.invoke('git:add', cwd),
   gitCommit: (cwd: string, message: string): Promise<SendResult> =>
     ipcRenderer.invoke('git:commit', { cwd, message }),

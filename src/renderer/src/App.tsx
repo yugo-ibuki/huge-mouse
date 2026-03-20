@@ -94,6 +94,10 @@ function App(): React.JSX.Element {
   const [history, setHistory] = useState<string[]>([])
   const historyIndex = useRef(-1)
   const savedDraft = useRef('')
+  const [slashCommands, setSlashCommands] = useState<{ name: string; description: string; source: 'user' | 'project' }[]>([])
+  const [slashPickerVisible, setSlashPickerVisible] = useState(false)
+  const [slashFilter, setSlashFilter] = useState('')
+  const [slashIndex, setSlashIndex] = useState(0)
 
   useEffect(() => {
     window.api.getAlwaysOnTop().then(setAlwaysOnTop)
@@ -374,6 +378,20 @@ function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
   }, [selected, panes, choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup, createDialog, confirmKill])
 
+  const filteredCommands = slashCommands.filter(
+    (c) => !slashFilter || c.name.toLowerCase().includes(slashFilter.toLowerCase())
+  )
+
+  const applySlashCommand = useCallback(
+    (name: string) => {
+      setText(`/${name} `)
+      setSlashPickerVisible(false)
+      setSlashFilter('')
+      requestAnimationFrame(() => textareaRef.current?.focus())
+    },
+    []
+  )
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.nativeEvent.isComposing) return
@@ -398,6 +416,36 @@ function App(): React.JSX.Element {
           return
         }
       }
+      // When slash picker is visible, arrow keys navigate it
+      if (slashPickerVisible && filteredCommands.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setSlashIndex((i) => Math.min(i + 1, filteredCommands.length - 1))
+          return
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setSlashIndex((i) => Math.max(i - 1, 0))
+          return
+        }
+        if (e.key === 'Enter' && !e.metaKey && !e.shiftKey) {
+          e.preventDefault()
+          applySlashCommand(filteredCommands[slashIndex].name)
+          return
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setSlashPickerVisible(false)
+          setSlashFilter('')
+          return
+        }
+        if (e.key === 'Tab') {
+          e.preventDefault()
+          applySlashCommand(filteredCommands[slashIndex].name)
+          return
+        }
+      }
+
       if (e.key === 'ArrowUp' && !e.metaKey && history.length > 0) {
         const ta = e.currentTarget as HTMLTextAreaElement
         const isAtTop = !ta.value.includes('\n') || ta.selectionStart === 0
@@ -428,7 +476,36 @@ function App(): React.JSX.Element {
         }
       }
     },
-    [send, sendKey, history, text]
+    [send, sendKey, history, text, slashPickerVisible, filteredCommands, slashIndex, applySlashCommand]
+  )
+
+  // Detect slash command trigger: text is "/" or starts with "/" at position 0
+  const handleTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value
+      setText(val)
+
+      // Check if the text starts with "/" (or is exactly "/")
+      const slashMatch = val.match(/^(\/\S*)/)
+      if (slashMatch) {
+        const typed = slashMatch[1].slice(1) // strip leading "/"
+        setSlashFilter(typed)
+        setSlashIndex(0)
+        if (!slashPickerVisible && selected) {
+          // Lazy-load commands when picker first opens
+          window.api.listCommands(selected).then((cmds) => {
+            setSlashCommands(cmds)
+            setSlashPickerVisible(true)
+          })
+        } else {
+          setSlashPickerVisible(true)
+        }
+      } else {
+        setSlashPickerVisible(false)
+        setSlashFilter('')
+      }
+    },
+    [slashPickerVisible, selected]
   )
 
   const toggleAlwaysOnTop = async (): Promise<void> => {
@@ -560,15 +637,41 @@ function App(): React.JSX.Element {
             </div>
           )}
 
-          <textarea
-            ref={textareaRef}
-            className="textarea"
-            rows={5}
-            placeholder={`Type input to send... (${sendKey === 'cmd+enter' ? 'Cmd+Enter' : 'Enter'} to send)`}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
+          <div className="textarea-wrap">
+            <textarea
+              ref={textareaRef}
+              className="textarea"
+              rows={5}
+              placeholder={`Type input to send... (${sendKey === 'cmd+enter' ? 'Cmd+Enter' : 'Enter'} to send)`}
+              value={text}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+            />
+            {slashPickerVisible && filteredCommands.length > 0 && (
+              <div className="slash-picker">
+                {filteredCommands.map((cmd, i) => (
+                  <button
+                    key={`${cmd.source}:${cmd.name}`}
+                    className={`slash-item ${i === slashIndex ? 'slash-item-active' : ''}`}
+                    onMouseDown={(e) => {
+                      // Prevent textarea blur before click registers
+                      e.preventDefault()
+                      applySlashCommand(cmd.name)
+                    }}
+                    onMouseEnter={() => setSlashIndex(i)}
+                  >
+                    <span className="slash-name">/{cmd.name}</span>
+                    {cmd.description && (
+                      <span className="slash-desc">{cmd.description}</span>
+                    )}
+                    <span className={`slash-badge slash-badge-${cmd.source}`}>
+                      {cmd.source}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="footer">
             {status && (
