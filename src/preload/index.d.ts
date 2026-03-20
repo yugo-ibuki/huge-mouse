@@ -38,9 +38,12 @@ interface SendResult {
 
 interface TmuxAPI {
   listSessions: () => Promise<TmuxPane[]>
-  sendInput: (target: string, text: string) => Promise<SendResult>
+  sendInput: (target: string, text: string, vimMode?: boolean) => Promise<SendResult>
   capturePane: (target: string) => Promise<string>
   getPaneDetail: (target: string) => Promise<PaneDetail | null>
+  listTmuxSessions: () => Promise<string[]>
+  createSession: (sessionName: string, command: 'claude' | 'codex') => Promise<SendResult>
+  killPane: (target: string) => Promise<SendResult>
   gitAdd: (cwd: string) => Promise<SendResult>
   gitCommit: (cwd: string, message: string) => Promise<SendResult>
   gitPush: (cwd: string) => Promise<SendResult>
@@ -49,6 +52,9 @@ interface TmuxAPI {
   setOpacity: (value: number) => Promise<number>
   getOpacity: () => Promise<number>
   setFocusShortcut: (key: string) => Promise<boolean>
+  toggleCompact: () => Promise<boolean>
+  onCompactChanged: (callback: (compact: boolean) => void) => () => void
+  onFocusTextarea: (callback: () => void) => () => void
 }
 
 declare global {

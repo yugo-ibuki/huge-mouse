@@ -1,7 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush } from './tmux'
+import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush, listTmuxSessions, createSession, killPane } from './tmux'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -41,8 +41,8 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle('tmux:send-input', async (_event, { target, text }) => {
-    return sendInput(target, text)
+  ipcMain.handle('tmux:send-input', async (_event, { target, text, vimMode }) => {
+    return sendInput(target, text, vimMode)
   })
 
   ipcMain.handle('tmux:capture-pane', async (_event, target: string) => {
@@ -51,6 +51,22 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tmux:pane-detail', async (_event, target: string) => {
     return getPaneDetail(target)
+  })
+
+  ipcMain.handle('tmux:list-tmux-sessions', async () => {
+    try {
+      return await listTmuxSessions()
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('tmux:create-session', async (_event, { sessionName, command }) => {
+    return createSession(sessionName, command)
+  })
+
+  ipcMain.handle('tmux:kill-pane', async (_event, target: string) => {
+    return killPane(target)
   })
 
   ipcMain.handle('git:add', async (_event, cwd: string) => gitAdd(cwd))
@@ -79,6 +95,30 @@ app.whenReady().then(() => {
     return win?.getOpacity() ?? 1
   })
 
+  let savedBounds: Electron.Rectangle | null = null
+  let isCompact = false
+
+  const toggleCompact = (): boolean => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (!win) return isCompact
+    if (!isCompact) {
+      savedBounds = win.getBounds()
+      const bounds = win.getBounds()
+      win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: 70 })
+      isCompact = true
+    } else if (savedBounds) {
+      win.setBounds(savedBounds)
+      savedBounds = null
+      isCompact = false
+    }
+    win.webContents.send('compact-changed', isCompact)
+    return isCompact
+  }
+
+  ipcMain.handle('window:toggle-compact', () => {
+    return toggleCompact()
+  })
+
   createWindow()
 
   const registerFocusShortcut = (key: string): boolean => {
@@ -87,8 +127,10 @@ app.whenReady().then(() => {
     return globalShortcut.register(accelerator, () => {
       const win = BrowserWindow.getAllWindows()[0]
       if (win) {
+        if (isCompact) toggleCompact()
         win.show()
         win.focus()
+        win.webContents.send('focus-textarea')
       }
     })
   }

@@ -59,6 +59,7 @@ function run(args: string[]): Promise<string> {
   })
 }
 
+
 function runGit(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(gitBin, args, { timeout: 30000 }, (error, stdout) => {
@@ -176,12 +177,26 @@ function parsePrompt(content: string): string {
   return promptLines.join('\n').trim()
 }
 
-function detectStatus(title: string, content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+// Codex displays "-ing" words during processing: Working, Thinking, Reconnecting, etc.
+// These typically appear with "esc to interrupt" nearby.
+const CODEX_BUSY_PATTERNS = [
+  /\b(?:Working|Thinking|Reconnecting|Connecting|Executing)\b/,
+  /esc to interrupt/i
+]
+
+// Codex footer hint when idle: "Enter to send", "Ctrl+J" / "newline", "quit" etc.
+// The Rust TUI may show these on separate lines or in different formats,
+// so check for any of them individually rather than requiring all on one line.
+const CODEX_IDLE_INDICATORS = [
+  /enter\s+to\s+send/i,
+  /\bsend\b.*\bnewline\b.*\bquit\b/ // legacy format (backward compat)
+]
+
+function detectStatusClaude(title: string, content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
   if (!title.includes('✳')) return { status: 'busy', choices: [], prompt: '' }
 
   const choices = parseChoices(content)
 
-  // If numbered choices are detected, it's a waiting state regardless of prompt text
   if (choices.length > 0) {
     return { status: 'waiting', choices, prompt: parsePrompt(content) }
   }
@@ -193,6 +208,43 @@ function detectStatus(title: string, content: string): { status: PaneStatus; cho
     }
   }
   return { status: 'idle', choices: [], prompt: '' }
+}
+
+// Codex presents options as indented "- " list items
+const CODEX_OPTION_PATTERN = /^\s+-\s+\S/
+// "- ...?" is a definitive question/choice indicator
+const CODEX_QUESTION_PATTERN = /^\s+-\s+.+\?/
+
+function detectStatusCodex(content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+  const lines = content.split('\n').slice(-15)
+  const tail = lines.join('\n')
+
+  // 1. Check for explicit busy signals (-ing words or "esc to interrupt")
+  const isBusy = CODEX_BUSY_PATTERNS.some((p) => p.test(tail))
+  if (isBusy) {
+    return { status: 'busy', choices: [], prompt: '' }
+  }
+
+  // 2. Check for explicit idle signals (footer hints)
+  const isIdle = CODEX_IDLE_INDICATORS.some((p) => p.test(tail))
+  if (isIdle) {
+    const hasQuestion = lines.some((line) => CODEX_QUESTION_PATTERN.test(line))
+    const optionCount = lines.filter((line) => CODEX_OPTION_PATTERN.test(line)).length
+    if (hasQuestion || optionCount >= 2) {
+      return { status: 'waiting', choices: [], prompt: '' }
+    }
+    return { status: 'idle', choices: [], prompt: '' }
+  }
+
+  // 3. No busy signal detected → default to idle (not busy).
+  // If Codex is NOT showing "Working"/"Thinking"/etc,
+  // it is most likely at the input prompt waiting for user input.
+  return { status: 'idle', choices: [], prompt: '' }
+}
+
+function detectStatus(title: string, content: string, command: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+  if (command === 'codex') return detectStatusCodex(content)
+  return detectStatusClaude(title, content)
 }
 
 export async function listPanes(): Promise<TmuxPane[]> {
@@ -207,12 +259,31 @@ export async function listPanes(): Promise<TmuxPane[]> {
       const [target, pid, command, title] = line.split('|')
       return { target, pid, command, title, status: 'busy' as PaneStatus, choices: [] as TmuxChoice[], prompt: '' }
     })
-    .filter((pane) => /^(claude|codex)$/i.test(pane.command))
+    // Support popular wrappers like `ai` in addition to `claude` and `codex`.
+    // Also check pane_title as a fallback — when codex spawns subprocesses,
+    // pane_current_command may change to `node` while the title still contains `codex`.
+    .filter((pane) => {
+      if (/^(claude|codex|ai)(\b|-)/i.test(pane.command)) {
+        // Normalize variant names like `codex-aarch64-a` to `codex`
+        if (/^codex/i.test(pane.command)) pane.command = 'codex'
+        else if (/^claude/i.test(pane.command)) pane.command = 'claude'
+        return true
+      }
+      if (/\b(claude|codex)\b/i.test(pane.title)) {
+        // pane_current_command changed to a subprocess (e.g. node).
+        // Normalize command so detectStatus routes correctly.
+        const titleLower = pane.title.toLowerCase()
+        if (titleLower.includes('codex')) pane.command = 'codex'
+        else if (titleLower.includes('claude')) pane.command = 'claude'
+        return true
+      }
+      return false
+    })
 
   await Promise.all(
     panes.map(async (pane) => {
       const content = await capturePaneContent(pane.target)
-      const result = detectStatus(pane.title, content)
+      const result = detectStatus(pane.title, content, pane.command)
       pane.status = result.status
       pane.choices = result.choices
       pane.prompt = result.prompt
@@ -226,7 +297,8 @@ const TARGET_PATTERN = /^[a-zA-Z0-9_-]+:\d+\.\d+$/
 
 export async function sendInput(
   target: string,
-  text: string
+  text: string,
+  vimMode = false
 ): Promise<{ success: boolean; error?: string }> {
   if (!TARGET_PATTERN.test(target)) {
     return { success: false, error: 'Invalid target format' }
@@ -237,20 +309,29 @@ export async function sendInput(
     // When choices are visible and input is a single digit (1-9),
     // skip insert mode switch since choices work in normal mode.
     const content = await capturePane(target)
-    const title = await run(['display-message', '-t', target, '-p', '#{pane_title}'])
-    const { status } = detectStatus(title.trim(), content)
+    const titleAndCmd = await run(['display-message', '-t', target, '-p', '#{pane_title}|#{pane_current_command}'])
+    const [title, command] = titleAndCmd.trim().split('|')
+    const { status } = detectStatus(title, content, command)
     const isChoiceResponse = status === 'waiting' && /^[1-9]$/.test(text)
 
-    if (!isChoiceResponse) {
-      // Ensure insert mode: Escape (go to normal) → i (enter insert)
+    // Only send Escape+i when Claude CLI is in vim input mode.
+    // In native (readline) mode, Escape+i would type a literal "i".
+    if (!isChoiceResponse && vimMode) {
       await run(['send-keys', '-t', target, 'Escape'])
       await new Promise((r) => setTimeout(r, 50))
       await run(['send-keys', '-t', target, 'i'])
       await new Promise((r) => setTimeout(r, 100))
     }
 
+    const isCodex = command === 'codex'
     const hasNewlines = text.includes('\n')
-    if (hasNewlines) {
+
+    if (isCodex) {
+      // Codex ignores Enter from external tmux clients. Use run-shell
+      // to execute send-keys from within the tmux server process itself.
+      await run(['send-keys', '-t', target, '-l', text])
+      await run(['run-shell', `${tmuxBin} send-keys -t ${target} Enter`])
+    } else if (hasNewlines) {
       // Send bracketed paste escape sequences to preserve newlines
       const trimmed = text.replace(/\n+$/, '')
       await run(['send-keys', '-t', target, '\x1b[200~'])
@@ -355,6 +436,42 @@ export async function gitCommit(
 export async function gitPush(cwd: string): Promise<{ success: boolean; error?: string }> {
   try {
     await runGit(['-C', cwd, 'push'])
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function listTmuxSessions(): Promise<string[]> {
+  try {
+    const stdout = await run(['list-sessions', '-F', '#{session_name}'])
+    return stdout
+      .trim()
+      .split('\n')
+      .filter((s) => s.length > 0)
+  } catch {
+    return []
+  }
+}
+
+export async function createSession(
+  sessionName: string,
+  command: 'claude' | 'codex'
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await run(['new-window', '-t', sessionName, command])
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function killPane(target: string): Promise<{ success: boolean; error?: string }> {
+  if (!TARGET_PATTERN.test(target)) {
+    return { success: false, error: 'Invalid target format' }
+  }
+  try {
+    await run(['kill-pane', '-t', target])
     return { success: true }
   } catch (e) {
     return { success: false, error: String(e) }

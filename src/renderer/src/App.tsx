@@ -60,6 +60,20 @@ function App(): React.JSX.Element {
   const [focusKey, setFocusKey] = useState(() => {
     return localStorage.getItem('focusKey') ?? 'h'
   })
+  const [fontSize, setFontSize] = useState(() => {
+    return Number(localStorage.getItem('fontSize') ?? '12')
+  })
+  const [sendKey, setSendKey] = useState<'enter' | 'cmd+enter'>(() => {
+    return (localStorage.getItem('sendKey') as 'enter' | 'cmd+enter') ?? 'cmd+enter'
+  })
+  const [vimMode, setVimMode] = useState(() => {
+    return localStorage.getItem('vimMode') === 'true'
+  })
+  const [compact, setCompact] = useState(false)
+  const [compactKey, setCompactKey] = useState(() => {
+    return localStorage.getItem('compactKey') ?? 'w'
+  })
+  const [editingCompactKey, setEditingCompactKey] = useState(false)
   const [editingPreviewKey, setEditingPreviewKey] = useState(false)
   const [editingDetailKey, setEditingDetailKey] = useState(false)
   const [editingGitKey, setEditingGitKey] = useState(false)
@@ -69,6 +83,11 @@ function App(): React.JSX.Element {
   const [commitMsg, setCommitMsg] = useState('')
   const [gitResult, setGitResult] = useState<{ message: string; ok: boolean } | null>(null)
   const [gitPopup, setGitPopup] = useState<PaneDetail | null>(null)
+  const [createDialog, setCreateDialog] = useState(false)
+  const [tmuxSessions, setTmuxSessions] = useState<string[]>([])
+  const [newSessionTarget, setNewSessionTarget] = useState('')
+  const [newSessionCommand, setNewSessionCommand] = useState<'claude' | 'codex'>('claude')
+  const [confirmKill, setConfirmKill] = useState(false)
   const detailContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const paneViewerRef = useRef<HTMLPreElement>(null)
@@ -90,6 +109,25 @@ function App(): React.JSX.Element {
   }, [paneContent, paneDetail, gitPopup])
 
   useEffect(() => {
+    document.documentElement.style.setProperty('--font-size', `${fontSize}px`)
+  }, [fontSize])
+
+  useEffect(() => {
+    return window.api.onCompactChanged((value) => {
+      setCompact(value)
+      if (!value) {
+        requestAnimationFrame(() => textareaRef.current?.focus())
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    return window.api.onFocusTextarea(() => {
+      requestAnimationFrame(() => textareaRef.current?.focus())
+    })
+  }, [])
+
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
   }, [theme])
@@ -101,6 +139,10 @@ function App(): React.JSX.Element {
   useEffect(() => {
     localStorage.setItem('previewKey', previewKey)
   }, [previewKey])
+
+  useEffect(() => {
+    localStorage.setItem('compactKey', compactKey)
+  }, [compactKey])
 
   useEffect(() => {
     localStorage.setItem('focusKey', focusKey)
@@ -133,7 +175,7 @@ function App(): React.JSX.Element {
     if (!selected || !text.trim()) return
 
     const sent = text
-    const result = await window.api.sendInput(selected, sent)
+    const result = await window.api.sendInput(selected, sent, vimMode)
     if (result.success) {
       setHistory((prev) => [...prev, sent])
       historyIndex.current = -1
@@ -144,13 +186,40 @@ function App(): React.JSX.Element {
       setStatus({ message: result.error ?? 'Failed', ok: false })
     }
     setTimeout(() => setStatus(null), 2000)
-  }, [selected, text])
+  }, [selected, text, vimMode])
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
       const isPrevPane = (e.metaKey && e.key === 'ArrowUp') || (e.ctrlKey && e.key === 'h' && !e.metaKey)
       const isNextPane = (e.metaKey && e.key === 'ArrowDown') || (e.ctrlKey && e.key === 'l' && !e.metaKey)
-      if (isPrevPane) {
+      // Ctrl+Cmd+H/L → jump across session boundaries
+      const isPrevSession = e.ctrlKey && e.metaKey && e.key === 'h'
+      const isNextSession = e.ctrlKey && e.metaKey && e.key === 'l'
+      if (isPrevSession || isNextSession) {
+        e.preventDefault()
+        setPanes((prev) => {
+          if (prev.length === 0) return prev
+          const sessionNames: string[] = []
+          const sessionFirstIdx: number[] = []
+          for (let i = 0; i < prev.length; i++) {
+            const sess = prev[i].target.split(':')[0]
+            if (sessionNames[sessionNames.length - 1] !== sess) {
+              sessionNames.push(sess)
+              sessionFirstIdx.push(i)
+            }
+          }
+          const currentSess = selected ? selected.split(':')[0] : ''
+          const currentSessionIdx = sessionNames.indexOf(currentSess)
+          let nextSessionIdx: number
+          if (isPrevSession) {
+            nextSessionIdx = currentSessionIdx > 0 ? currentSessionIdx - 1 : sessionNames.length - 1
+          } else {
+            nextSessionIdx = currentSessionIdx < sessionNames.length - 1 ? currentSessionIdx + 1 : 0
+          }
+          setSelected(prev[sessionFirstIdx[nextSessionIdx]].target)
+          return prev
+        })
+      } else if (isPrevPane) {
         e.preventDefault()
         setPanes((prev) => {
           const idx = prev.findIndex((p) => p.target === selected)
@@ -180,7 +249,7 @@ function App(): React.JSX.Element {
           const choice = pane.choices.find((c) => c.number === digitStr)
           if (choice) {
             e.preventDefault()
-            window.api.sendInput(pane.target, choice.number).then((result) => {
+            window.api.sendInput(pane.target, choice.number, vimMode).then((result) => {
               if (result.success) {
                 setStatus({ message: `Sent ${choice.number} → ${pane.target}`, ok: true })
               } else {
@@ -192,14 +261,23 @@ function App(): React.JSX.Element {
         }
       }
 
+      // Ctrl+[compactKey] → toggle compact mode
+      if (e.ctrlKey && e.key === compactKey && !e.metaKey) {
+        e.preventDefault()
+        window.api.toggleCompact()
+      }
+
       // Ctrl+[previewKey] → show pane content popup
       if (e.ctrlKey && e.key === previewKey && !e.metaKey) {
         e.preventDefault()
         if (selected) {
           window.api.capturePane(selected).then((content) => {
             setPaneContent(content)
+            // Double rAF: first for React render, second for layout
             requestAnimationFrame(() => {
-              paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+              requestAnimationFrame(() => {
+                paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+              })
             })
           })
         }
@@ -247,8 +325,36 @@ function App(): React.JSX.Element {
         }
       }
 
+      // Ctrl+N → open create session dialog
+      if (e.ctrlKey && e.key === 'n' && !e.metaKey) {
+        e.preventDefault()
+        window.api.listTmuxSessions().then((sessions) => {
+          setTmuxSessions(sessions)
+          setNewSessionTarget(sessions[0] ?? '')
+          setNewSessionCommand('claude')
+          setCreateDialog(true)
+        })
+      }
+
+      // Ctrl+C → confirm kill when detail panel is open
+      if (e.ctrlKey && e.key === 'c' && !e.metaKey && paneDetail !== null) {
+        e.preventDefault()
+        setConfirmKill(true)
+      }
+
       // Escape → close popups and refocus textarea
       if (e.key === 'Escape') {
+        if (confirmKill) {
+          e.preventDefault()
+          setConfirmKill(false)
+          return
+        }
+        if (createDialog) {
+          e.preventDefault()
+          setCreateDialog(false)
+          requestAnimationFrame(() => textareaRef.current?.focus())
+          return
+        }
         if (paneContent !== null) {
           e.preventDefault()
           setPaneContent(null)
@@ -266,14 +372,31 @@ function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [selected, panes, choiceModifier, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup])
+  }, [selected, panes, choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, paneContent, paneDetail, gitPopup, createDialog, confirmKill])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && e.metaKey) {
-        e.preventDefault()
-        send()
-        return
+      if (e.nativeEvent.isComposing) return
+      if (e.key === 'Enter') {
+        const isSend =
+          sendKey === 'cmd+enter' ? e.metaKey : !e.metaKey && !e.shiftKey
+        if (isSend) {
+          e.preventDefault()
+          send()
+          return
+        }
+        if (sendKey === 'enter' && e.metaKey) {
+          e.preventDefault()
+          const ta = e.currentTarget as HTMLTextAreaElement
+          const start = ta.selectionStart
+          const end = ta.selectionEnd
+          const val = ta.value
+          setText(val.substring(0, start) + '\n' + val.substring(end))
+          requestAnimationFrame(() => {
+            ta.selectionStart = ta.selectionEnd = start + 1
+          })
+          return
+        }
       }
       if (e.key === 'ArrowUp' && !e.metaKey && history.length > 0) {
         const ta = e.currentTarget as HTMLTextAreaElement
@@ -305,7 +428,7 @@ function App(): React.JSX.Element {
         }
       }
     },
-    [send, history, text]
+    [send, sendKey, history, text]
   )
 
   const toggleAlwaysOnTop = async (): Promise<void> => {
@@ -333,7 +456,7 @@ function App(): React.JSX.Element {
               {group.map((p) => (
                 <div key={p.target} className="tag-row">
                   <button
-                    className={`tag ${selected === p.target ? 'tag-active' : ''} ${p.status !== 'idle' ? 'tag-dim' : ''}`}
+                    className={`tag ${selected === p.target ? 'tag-active' : ''} ${p.status !== 'idle' ? 'tag-dim' : ''} ${p.command === 'codex' ? 'tag-codex' : ''}`}
                     onClick={() => setSelected(p.target)}
                     onKeyDown={(e) => {
                       if (e.key === 'Tab' && !e.shiftKey && p.choices.length > 0) {
@@ -345,6 +468,7 @@ function App(): React.JSX.Element {
                     }}
                   >
                     <span className={`dot dot-${p.status}`} />
+                    <span className={`cmd-badge cmd-badge-${p.command}`}>{p.command === 'codex' ? 'CX' : 'CC'}</span>
                     {p.target.split(':')[1]}
                   </button>
                   {p.choices.length > 0 && (
@@ -379,7 +503,7 @@ function App(): React.JSX.Element {
                             }
                           }}
                           onClick={async () => {
-                            await window.api.sendInput(p.target, c.number)
+                            await window.api.sendInput(p.target, c.number, vimMode)
                             setStatus({ message: `Sent ${c.number} → ${p.target}`, ok: true })
                             setTimeout(() => setStatus(null), 2000)
                           }}
@@ -399,7 +523,7 @@ function App(): React.JSX.Element {
         </button>
       </div>
 
-      <div className="main-area">
+      {!compact && <div className="main-area">
         <div className="content">
           {selectedPane?.prompt && (
             <div className="prompt-box">
@@ -411,7 +535,7 @@ function App(): React.JSX.Element {
                       key={c.number}
                       className="prompt-choice-btn"
                       onClick={async () => {
-                        await window.api.sendInput(selectedPane.target, c.number)
+                        await window.api.sendInput(selectedPane.target, c.number, vimMode)
                         setStatus({
                           message: `Sent ${c.number} → ${selectedPane.target}`,
                           ok: true
@@ -440,7 +564,7 @@ function App(): React.JSX.Element {
             ref={textareaRef}
             className="textarea"
             rows={5}
-            placeholder="Type input to send... (Cmd+Enter to send)"
+            placeholder={`Type input to send... (${sendKey === 'cmd+enter' ? 'Cmd+Enter' : 'Enter'} to send)`}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -484,6 +608,22 @@ function App(): React.JSX.Element {
               }}
             />
           </label>
+          <label className="setting-row">
+            <span className="setting-label">Font Size</span>
+            <input
+              type="range"
+              className="opacity-slider"
+              min="8"
+              max="18"
+              step="1"
+              value={fontSize}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                setFontSize(v)
+                localStorage.setItem('fontSize', String(v))
+              }}
+            />
+          </label>
           <div
             className="setting-row"
             style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}
@@ -524,6 +664,71 @@ function App(): React.JSX.Element {
               </button>
             </div>
           </div>
+          <div
+            className="setting-row"
+            style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}
+          >
+            <span className="setting-label">Send Key</span>
+            <div className="theme-segment">
+              <button
+                className={`theme-btn ${sendKey === 'cmd+enter' ? 'theme-btn-active' : ''}`}
+                onClick={() => {
+                  setSendKey('cmd+enter')
+                  localStorage.setItem('sendKey', 'cmd+enter')
+                }}
+              >
+                ⌘↵
+              </button>
+              <button
+                className={`theme-btn ${sendKey === 'enter' ? 'theme-btn-active' : ''}`}
+                onClick={() => {
+                  setSendKey('enter')
+                  localStorage.setItem('sendKey', 'enter')
+                }}
+              >
+                ↵
+              </button>
+            </div>
+          </div>
+          <label className="setting-row">
+            <span className="setting-label">Vim Mode</span>
+            <button
+              className={`toggle ${vimMode ? 'toggle-on' : ''}`}
+              onClick={() => {
+                const next = !vimMode
+                setVimMode(next)
+                localStorage.setItem('vimMode', String(next))
+              }}
+            >
+              <span className="toggle-knob" />
+            </button>
+          </label>
+          <label className="setting-row">
+            <span className="setting-label">Compact Key</span>
+            {editingCompactKey ? (
+              <span
+                className="key-capture"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  e.preventDefault()
+                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+                    setCompactKey(e.key.toLowerCase())
+                    setEditingCompactKey(false)
+                  }
+                  if (e.key === 'Escape') {
+                    setEditingCompactKey(false)
+                  }
+                }}
+                ref={(el) => el?.focus()}
+              >
+                Press a key...
+              </span>
+            ) : (
+              <button className="key-display" onClick={() => setEditingCompactKey(true)}>
+                Ctrl+{compactKey.toUpperCase()}
+              </button>
+            )}
+          </label>
           <label className="setting-row">
             <span className="setting-label">Preview Key</span>
             {editingPreviewKey ? (
@@ -629,7 +834,7 @@ function App(): React.JSX.Element {
             )}
           </label>
         </div>
-      </div>
+      </div>}
 
       {paneContent !== null && (
         <div
@@ -681,7 +886,20 @@ function App(): React.JSX.Element {
               </button>
             </div>
             <pre ref={paneViewerRef} className="pane-popup-content">
-              {paneContent}
+              {(() => {
+                if (!paneContent) return null
+                // Find the last Claude response (starts with ⏺)
+                const lastIdx = paneContent.lastIndexOf('\n⏺')
+                if (lastIdx === -1) return paneContent
+                const before = paneContent.slice(0, lastIdx + 1)
+                const after = paneContent.slice(lastIdx + 1)
+                return (
+                  <>
+                    {before}
+                    <span className="last-response">{after}</span>
+                  </>
+                )
+              })()}
             </pre>
           </div>
         </div>
@@ -743,6 +961,14 @@ function App(): React.JSX.Element {
               </button>
             </div>
             <div ref={detailContentRef} className="detail-grid">
+              <div className="detail-actions">
+                <button
+                  className="git-btn detail-kill-btn"
+                  onClick={() => setConfirmKill(true)}
+                >
+                  Close Session
+                </button>
+              </div>
               <span className="detail-label">Target</span>
               <span className="detail-value">{paneDetail.target}</span>
               <span className="detail-label">Command</span>
@@ -877,6 +1103,147 @@ function App(): React.JSX.Element {
                   {gitResult.message}
                 </span>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createDialog && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => {
+            if (el && !el.dataset.focused) {
+              el.focus()
+              el.dataset.focused = 'true'
+            }
+          }}
+          onClick={() => { setCreateDialog(false); requestAnimationFrame(() => textareaRef.current?.focus()) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setCreateDialog(false)
+              requestAnimationFrame(() => textareaRef.current?.focus())
+              e.preventDefault()
+            }
+          }}
+        >
+          <div className="pane-popup detail-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">New Session</span>
+              <button className="pane-popup-close" onClick={() => { setCreateDialog(false); requestAnimationFrame(() => textareaRef.current?.focus()) }}>
+                Esc
+              </button>
+            </div>
+            <div className="create-session-form">
+              <label className="setting-row">
+                <span className="setting-label">Session</span>
+                <select
+                  className="create-session-select"
+                  value={newSessionTarget}
+                  onChange={(e) => setNewSessionTarget(e.target.value)}
+                >
+                  {tmuxSessions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="setting-row">
+                <span className="setting-label">Command</span>
+                <div className="theme-segment">
+                  <button
+                    className={`theme-btn ${newSessionCommand === 'claude' ? 'theme-btn-active' : ''}`}
+                    onClick={() => setNewSessionCommand('claude')}
+                  >
+                    claude
+                  </button>
+                  <button
+                    className={`theme-btn ${newSessionCommand === 'codex' ? 'theme-btn-active' : ''}`}
+                    onClick={() => setNewSessionCommand('codex')}
+                  >
+                    codex
+                  </button>
+                </div>
+              </label>
+              <button
+                className="git-btn create-session-btn"
+                disabled={!newSessionTarget}
+                onClick={async () => {
+                  const r = await window.api.createSession(newSessionTarget, newSessionCommand)
+                  if (r.success) {
+                    setCreateDialog(false)
+                    setStatus({ message: `Created ${newSessionCommand} in ${newSessionTarget}`, ok: true })
+                    // Refresh pane list
+                    const result = await window.api.listSessions()
+                    setPanes(result)
+                  } else {
+                    setStatus({ message: r.error ?? 'Failed', ok: false })
+                  }
+                  setTimeout(() => setStatus(null), 2000)
+                  requestAnimationFrame(() => textareaRef.current?.focus())
+                }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmKill && paneDetail && (
+        <div
+          className="pane-overlay"
+          tabIndex={-1}
+          ref={(el) => {
+            if (el && !el.dataset.focused) {
+              el.focus()
+              el.dataset.focused = 'true'
+            }
+          }}
+          onClick={() => setConfirmKill(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setConfirmKill(false)
+              e.preventDefault()
+            }
+          }}
+        >
+          <div className="pane-popup detail-popup confirm-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="pane-popup-header">
+              <span className="pane-popup-title">Confirm Close</span>
+            </div>
+            <div className="confirm-body">
+              <p>Close session <strong>{paneDetail.target}</strong> ({paneDetail.command})?</p>
+              <div className="confirm-actions">
+                <button
+                  className="git-btn"
+                  onClick={() => setConfirmKill(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="git-btn detail-kill-btn"
+                  onClick={async () => {
+                    const r = await window.api.killPane(paneDetail.target)
+                    setConfirmKill(false)
+                    setPaneDetail(null)
+                    if (r.success) {
+                      setStatus({ message: `Closed ${paneDetail.target}`, ok: true })
+                      if (selected === paneDetail.target) setSelected('')
+                      const result = await window.api.listSessions()
+                      setPanes(result)
+                      if (result.length > 0 && !result.find((p) => p.target === selected)) {
+                        setSelected(result[0].target)
+                      }
+                    } else {
+                      setStatus({ message: r.error ?? 'Failed', ok: false })
+                    }
+                    setTimeout(() => setStatus(null), 2000)
+                    requestAnimationFrame(() => textareaRef.current?.focus())
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -30,12 +30,17 @@ export interface SendResult {
 
 const api = {
   listSessions: (): Promise<TmuxPane[]> => ipcRenderer.invoke('tmux:list-sessions'),
-  sendInput: (target: string, text: string): Promise<SendResult> =>
-    ipcRenderer.invoke('tmux:send-input', { target, text }),
+  sendInput: (target: string, text: string, vimMode = false): Promise<SendResult> =>
+    ipcRenderer.invoke('tmux:send-input', { target, text, vimMode }),
   capturePane: (target: string): Promise<string> =>
     ipcRenderer.invoke('tmux:capture-pane', target),
   getPaneDetail: (target: string): Promise<PaneDetail | null> =>
     ipcRenderer.invoke('tmux:pane-detail', target),
+  listTmuxSessions: (): Promise<string[]> => ipcRenderer.invoke('tmux:list-tmux-sessions'),
+  createSession: (sessionName: string, command: 'claude' | 'codex'): Promise<SendResult> =>
+    ipcRenderer.invoke('tmux:create-session', { sessionName, command }),
+  killPane: (target: string): Promise<SendResult> =>
+    ipcRenderer.invoke('tmux:kill-pane', target),
   gitAdd: (cwd: string): Promise<SendResult> => ipcRenderer.invoke('git:add', cwd),
   gitCommit: (cwd: string, message: string): Promise<SendResult> =>
     ipcRenderer.invoke('git:commit', { cwd, message }),
@@ -48,6 +53,18 @@ const api = {
   getOpacity: (): Promise<number> => ipcRenderer.invoke('window:get-opacity'),
   setFocusShortcut: (key: string): Promise<boolean> =>
     ipcRenderer.invoke('window:set-focus-shortcut', key),
+  toggleCompact: (): Promise<boolean> =>
+    ipcRenderer.invoke('window:toggle-compact'),
+  onCompactChanged: (callback: (compact: boolean) => void): (() => void) => {
+    const handler = (_event: unknown, compact: boolean): void => callback(compact)
+    ipcRenderer.on('compact-changed', handler)
+    return () => ipcRenderer.removeListener('compact-changed', handler)
+  },
+  onFocusTextarea: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('focus-textarea', handler)
+    return () => ipcRenderer.removeListener('focus-textarea', handler)
+  },
 }
 
 if (process.contextIsolated) {
