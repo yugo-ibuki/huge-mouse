@@ -5,11 +5,7 @@ const { parseChoices, detectStatusClaude, trimCliFooter } = _testInternals
 
 describe('parseChoices', () => {
   it('detects marker-style choices (❯ 1. Yes / 2. No)', () => {
-    const content = [
-      'Do you want to proceed?',
-      ' ❯ 1. Yes',
-      '   2. No'
-    ].join('\n')
+    const content = ['Do you want to proceed?', ' ❯ 1. Yes', '   2. No'].join('\n')
 
     const choices = parseChoices(content)
     expect(choices).toEqual([
@@ -19,10 +15,9 @@ describe('parseChoices', () => {
   })
 
   it('detects colon-separated inline choices', () => {
-    const content = [
-      'Pick a deployment target:',
-      '  1: staging    2: production   3: dev'
-    ].join('\n')
+    const content = ['Pick a deployment target:', '  1: staging    2: production   3: dev'].join(
+      '\n'
+    )
 
     const choices = parseChoices(content)
     expect(choices).toEqual([
@@ -42,12 +37,9 @@ describe('parseChoices', () => {
   })
 
   it('detects dot-separated choices with ● marker', () => {
-    const content = [
-      'Some prompt text',
-      ' ● 1. Option A',
-      '   2. Option B',
-      '   3. Option C'
-    ].join('\n')
+    const content = ['Some prompt text', ' ● 1. Option A', '   2. Option B', '   3. Option C'].join(
+      '\n'
+    )
 
     const choices = parseChoices(content)
     expect(choices).toEqual([
@@ -58,11 +50,7 @@ describe('parseChoices', () => {
   })
 
   it('returns empty for content without choices', () => {
-    const content = [
-      '⏺ Here is a normal response.',
-      '',
-      'Some more text.'
-    ].join('\n')
+    const content = ['⏺ Here is a normal response.', '', 'Some more text.'].join('\n')
 
     expect(parseChoices(content)).toEqual([])
   })
@@ -75,6 +63,51 @@ describe('parseChoices', () => {
     expect(choices).toEqual([
       { number: '1', label: 'Yes' },
       { number: '2', label: 'No' }
+    ])
+  })
+
+  it('detects choices when option 2 label spans many lines (long command)', () => {
+    const commandLines = Array(25).fill('    $RG -n "\\bfoo\\b" $BASE --glob "**/*.{ts,tsx}"')
+    const content = [
+      'Do you want to proceed?',
+      ' ❯ 1. Yes',
+      '   2. Yes, and don\'t ask again for: BASE=/some/path',
+      '               RG=/opt/homebrew/bin/rg',
+      '',
+      ...commandLines,
+      '   3. No',
+      '',
+      'Esc to cancel'
+    ].join('\n')
+
+    const choices = parseChoices(content)
+    expect(choices.map((c) => c.number)).toEqual(['1', '2', '3'])
+  })
+
+  it('detects choices even with TUI padding and CLI footer below', () => {
+    const content = [
+      'Do you want to proceed?',
+      ' ❯ 1. Yes',
+      "   2. Yes, and don't ask again for: brew upgrade:*",
+      '   3. No',
+      '',
+      'Esc to cancel · Tab to amend · ctrl+e to explain',
+      // TUI padding (35 blank lines)
+      ...Array(35).fill(''),
+      // CLI footer
+      '──────────────────────────────────────────',
+      '❯ ',
+      '──────────────────────────────────────────',
+      '  Session ID: abc123 | main | Ctx: 83.5k',
+      '  Model: Opus 4.6 (1M context)',
+      ''
+    ].join('\n')
+
+    const choices = parseChoices(content)
+    expect(choices).toEqual([
+      { number: '1', label: 'Yes' },
+      { number: '2', label: "Yes, and don't ask again for: brew upgrade:*" },
+      { number: '3', label: 'No' }
     ])
   })
 
@@ -101,11 +134,7 @@ describe('parseChoices', () => {
 
 describe('detectStatusClaude', () => {
   it('returns waiting with choices when ✳ title and choices present', () => {
-    const content = [
-      'Some question?',
-      ' ❯ 1. Yes',
-      '   2. No'
-    ].join('\n')
+    const content = ['Some question?', ' ❯ 1. Yes', '   2. No'].join('\n')
 
     const result = detectStatusClaude('✳ Claude Code', content)
     expect(result.status).toBe('waiting')
@@ -114,11 +143,7 @@ describe('detectStatusClaude', () => {
 
   it('detects choices even when title shows busy (⠂)', () => {
     // Permission prompts appear while title is still ⠂
-    const content = [
-      ' Do you want to proceed?',
-      ' ❯ 1. Yes',
-      '   2. No'
-    ].join('\n')
+    const content = [' Do you want to proceed?', ' ❯ 1. Yes', '   2. No'].join('\n')
 
     const result = detectStatusClaude('⠂ Claude Code', content)
     expect(result.status).toBe('waiting')
@@ -153,7 +178,7 @@ describe('detectStatusClaude', () => {
 })
 
 describe('trimCliFooter', () => {
-  it('removes CLI footer (separator + status lines)', () => {
+  it('passes content through unchanged', () => {
     const content = [
       '⏺ Some response text',
       '',
@@ -161,45 +186,10 @@ describe('trimCliFooter', () => {
       '❯ ',
       '─────────────────────────────────────',
       '  Session ID: abc123 | ⎇ main',
-      '  Model: Opus 4.6',
       ''
     ].join('\n')
 
     const result = trimCliFooter(content)
-    expect(result).toBe('⏺ Some response text\n')
-  })
-
-  it('preserves content when no footer present', () => {
-    const content = '⏺ Just some text\nMore text\n'
-
-    const result = trimCliFooter(content)
-    expect(result).toBe('⏺ Just some text\nMore text\n')
-  })
-
-  it('preserves choices above the footer', () => {
-    const content = [
-      '● How is Claude doing this session?',
-      '  1: Bad    2: Fine   3: Good   0: Dismiss',
-      '',
-      '─────────────────────────────────────',
-      '❯ ',
-      '─────────────────────────────────────',
-      '  Session ID: abc123',
-      ''
-    ].join('\n')
-
-    const result = trimCliFooter(content)
-    expect(result).toContain('1: Bad')
-    expect(result).toContain('3: Good')
-    expect(result).not.toContain('Session ID')
-  })
-
-  it('does not strip content that contains ─ as part of normal text', () => {
-    const content = '⏺ Some text\n── heading ──\nMore text\n'
-
-    // Short separator within content (< 5 chars) should not trigger trimming
-    // but this one has 2 ─ which is less than 5, so it won't match
-    const result = trimCliFooter(content)
-    expect(result).toContain('heading')
+    expect(result).toBe(content)
   })
 })

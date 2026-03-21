@@ -49,16 +49,20 @@ function run(args: string[]): Promise<string> {
   const fullArgs = socketPath ? ['-S', socketPath, ...args] : args
 
   return new Promise((resolve, reject) => {
-    execFile(tmuxBin, fullArgs, { timeout: 5000, env: { ...process.env, LANG: 'en_US.UTF-8' } }, (error, stdout, stderr) => {
-      if (error) {
-        console.error('[tmux]', error.message, stderr)
-        return reject(error)
+    execFile(
+      tmuxBin,
+      fullArgs,
+      { timeout: 5000, env: { ...process.env, LANG: 'en_US.UTF-8' } },
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error('[tmux]', error.message, stderr)
+          return reject(error)
+        }
+        resolve(stdout)
       }
-      resolve(stdout)
-    })
+    )
   })
 }
-
 
 function runGit(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -99,7 +103,9 @@ function parseSessionId(content: string): string {
     const idMatch = line.match(/[Ss]ession(?:\s*ID)?[:\s]+([a-f0-9-]{8,})/)
     if (idMatch) return idMatch[1]
     // standalone UUID pattern near "session" context
-    const uuidMatch = line.match(/\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b/)
+    const uuidMatch = line.match(
+      /\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b/
+    )
     if (uuidMatch) return uuidMatch[1]
   }
   return ''
@@ -126,8 +132,8 @@ async function capturePaneContent(target: string): Promise<string> {
 //   One-per-line with colon:   "  1: Bad"
 //   Inline (multiple on one line): "  1: Bad    2: Fine   3: Good   0: Dismiss"
 // Marker characters: ❯ › > ☞ ●
-const MARKER_CHOICE_PATTERN = /^\s*[❯›>☞●]\s*(\d+)[.:)]\s+(.+)$/
-const PLAIN_CHOICE_PATTERN = /^\s+(\d+)[.:)]\s+(.+)$/
+const MARKER_CHOICE_PATTERN = /^\s*[❯›>☞●]\s*(\d+)[.:)]\s*(.+)$/
+const PLAIN_CHOICE_PATTERN = /^\s+(\d+)[.:)]\s*(.+)$/
 // Inline choices: multiple "N: label" separated by whitespace on a single line
 const INLINE_CHOICE_PATTERN = /(\d+)[.:)]\s+(\S+)/g
 
@@ -135,7 +141,35 @@ const INLINE_CHOICE_PATTERN = /(\d+)[.:)]\s+(\S+)/g
 const SESSION_RATING_PATTERN = /how is claude doing/i
 
 function parseChoices(content: string): TmuxChoice[] {
-  const lines = content.split('\n').slice(-20)
+  const allLines = content.split('\n')
+
+  // Strip trailing empty lines — TUI apps (Claude CLI) pad below visible content
+  while (allLines.length > 0 && allLines[allLines.length - 1].trim() === '') {
+    allLines.pop()
+  }
+  // Strip CLI footer lines (separator ─{5,}, session/model info, prompt cursor, mode indicator)
+  // so that the "last 20 lines" window reaches the actual content area.
+  while (allLines.length > 0) {
+    const last = allLines[allLines.length - 1]
+    if (
+      /─{5,}/.test(last) ||
+      /^\s*(Session|Model)\b/.test(last) ||
+      /^\s*❯\s*$/.test(last) ||
+      /\b(plan|compact) mode\b/.test(last)
+    ) {
+      allLines.pop()
+      // Also strip blank lines between footer sections
+      while (allLines.length > 0 && allLines[allLines.length - 1].trim() === '') {
+        allLines.pop()
+      }
+    } else {
+      break
+    }
+  }
+
+  // "Yes, and don't ask again for:" choices can include full command text,
+  // spanning many lines. 50 lines covers these long permission prompts.
+  const lines = allLines.slice(-50)
   const choices: TmuxChoice[] = []
   let inChoiceBlock = false
   for (let li = 0; li < lines.length; li++) {
@@ -187,7 +221,11 @@ function parsePrompt(content: string): string {
       if (pastChoices) break
       continue
     }
-    if (MARKER_CHOICE_PATTERN.test(line) || PLAIN_CHOICE_PATTERN.test(line) || /^Esc to cancel/.test(line)) {
+    if (
+      MARKER_CHOICE_PATTERN.test(line) ||
+      PLAIN_CHOICE_PATTERN.test(line) ||
+      /^Esc to cancel/.test(line)
+    ) {
       pastChoices = true
       continue
     }
@@ -214,7 +252,10 @@ const CODEX_IDLE_INDICATORS = [
   /\bsend\b.*\bnewline\b.*\bquit\b/ // legacy format (backward compat)
 ]
 
-function detectStatusClaude(title: string, content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+function detectStatusClaude(
+  title: string,
+  content: string
+): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
   // Always check for choices first — permission prompts (e.g. "Do you want to proceed?
   // ❯ 1. Yes  2. No") can appear while the title still shows ⠂ (busy).
   const choices = parseChoices(content)
@@ -238,7 +279,11 @@ const CODEX_OPTION_PATTERN = /^\s+-\s+\S/
 // "- ...?" is a definitive question/choice indicator
 const CODEX_QUESTION_PATTERN = /^\s+-\s+.+\?/
 
-function detectStatusCodex(content: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+function detectStatusCodex(content: string): {
+  status: PaneStatus
+  choices: TmuxChoice[]
+  prompt: string
+} {
   const lines = content.split('\n').slice(-15)
   const tail = lines.join('\n')
 
@@ -265,13 +310,18 @@ function detectStatusCodex(content: string): { status: PaneStatus; choices: Tmux
   return { status: 'idle', choices: [], prompt: '' }
 }
 
-function detectStatus(title: string, content: string, command: string): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+function detectStatus(
+  title: string,
+  content: string,
+  command: string
+): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
   if (command === 'codex') return detectStatusCodex(content)
   return detectStatusClaude(title, content)
 }
 
 export async function listPanes(): Promise<TmuxPane[]> {
-  const format = '#{session_name}:#{window_index}.#{pane_index}|#{pane_pid}|#{pane_current_command}|#{pane_title}'
+  const format =
+    '#{session_name}:#{window_index}.#{pane_index}|#{pane_pid}|#{pane_current_command}|#{pane_title}'
   const stdout = await run(['list-panes', '-a', '-F', format])
 
   const panes = stdout
@@ -280,7 +330,15 @@ export async function listPanes(): Promise<TmuxPane[]> {
     .filter((line) => line.length > 0)
     .map((line) => {
       const [target, pid, command, title] = line.split('|')
-      return { target, pid, command, title, status: 'busy' as PaneStatus, choices: [] as TmuxChoice[], prompt: '' }
+      return {
+        target,
+        pid,
+        command,
+        title,
+        status: 'busy' as PaneStatus,
+        choices: [] as TmuxChoice[],
+        prompt: ''
+      }
     })
     // Support popular wrappers like `ai` in addition to `claude` and `codex`.
     // Also check pane_title as a fallback — when codex spawns subprocesses,
@@ -332,7 +390,13 @@ export async function sendInput(
     // When choices are visible and input is a single digit (1-9),
     // skip insert mode switch since choices work in normal mode.
     const content = await capturePaneContent(target)
-    const titleAndCmd = await run(['display-message', '-t', target, '-p', '#{pane_title}|#{pane_current_command}'])
+    const titleAndCmd = await run([
+      'display-message',
+      '-t',
+      target,
+      '-p',
+      '#{pane_title}|#{pane_current_command}'
+    ])
     const [title, command] = titleAndCmd.trim().split('|')
     const { status } = detectStatus(title, content, command)
     const isChoiceResponse = status === 'waiting' && /^[1-9]$/.test(text)
@@ -501,32 +565,8 @@ export async function killPane(target: string): Promise<{ success: boolean; erro
   }
 }
 
-// Claude CLI footer lines: separator (─+), prompt (❯), session/model info, mode indicator.
-// These appear at the bottom of the pane and are not useful in the preview.
-// Claude CLI footer: everything from the first separator line (─{5,}) to the end.
-// Rather than matching individual lines, find the first separator and cut there.
 function trimCliFooter(output: string): string {
-  const lines = output.replace(/\n+$/, '').split('\n')
-  // Find the last occurrence of a separator line (─ repeated 5+ times)
-  // and remove everything from that point onward, including the blank line before it.
-  let cutIdx = -1
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (/─{5,}/.test(lines[i])) {
-      cutIdx = i
-      // Don't break — keep scanning upward to find the outermost separator
-    } else if (cutIdx !== -1 && lines[i].trim() !== '' && !/^❯/.test(lines[i])) {
-      // Hit real content above a separator — stop scanning
-      break
-    }
-  }
-  if (cutIdx > 0) {
-    // Also trim blank lines immediately before the separator
-    while (cutIdx > 0 && lines[cutIdx - 1].trim() === '') {
-      cutIdx--
-    }
-    return lines.slice(0, cutIdx).join('\n') + '\n'
-  }
-  return lines.join('\n') + '\n'
+  return output
 }
 
 export async function capturePane(target: string): Promise<string> {

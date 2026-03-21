@@ -3,7 +3,18 @@ import { join } from 'path'
 import { homedir } from 'os'
 import { readdir, readFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { listPanes, sendInput, capturePane, getPaneDetail, gitAdd, gitCommit, gitPush, listTmuxSessions, createSession, killPane } from './tmux'
+import {
+  listPanes,
+  sendInput,
+  capturePane,
+  getPaneDetail,
+  gitAdd,
+  gitCommit,
+  gitPush,
+  listTmuxSessions,
+  createSession,
+  killPane
+} from './tmux'
 
 interface SkillEntry {
   name: string
