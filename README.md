@@ -46,11 +46,11 @@ Each pane tag shows a badge indicating which tool is running: **CC** (Claude Cod
 
 ### Status indicators
 
-| Indicator | Meaning |
-|-----------|---------|
-| Green dot | Ready for input |
-| Orange dot | Busy, processing |
-| Gray dot | Waiting for your response — choice buttons appear |
+| Indicator  | Meaning                                           |
+| ---------- | ------------------------------------------------- |
+| Green dot  | Ready for input                                   |
+| Orange dot | Busy, processing                                  |
+| Gray dot   | Waiting for your response — choice buttons appear |
 
 ### When the AI asks a question
 
@@ -58,26 +58,26 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 
 ### Keyboard shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+Enter` or `Enter` | Send input (configurable) |
-| `Cmd+↑` | Switch to previous pane |
-| `Cmd+↓` | Switch to next pane |
-| `Ctrl+1-9` | Send numbered choice directly (modifier key configurable) |
-| `Ctrl+H` / `Ctrl+L` | Switch to previous / next pane |
-| `Ctrl+Cmd+H` / `Ctrl+Cmd+L` | Jump to previous / next session |
-| `Ctrl+P` | Open pane content preview / toggle live streaming (key configurable) |
-| `Ctrl+N` | Create a new session (select target tmux session and command) |
-| `Ctrl+D` | Open session detail popup (key configurable) |
-| `Ctrl+C` | Close session with confirmation (when detail panel is open) |
-| `Ctrl+G` | Open git operations popup (key configurable) |
-| `Ctrl+W` | Toggle compact mode — shrinks window to tab bar only (key configurable) |
-| `Ctrl+N` | Create a new session (select target tmux session and command) |
-| `/` | Open slash command autocomplete (when at start of input) |
-| `Ctrl+C` | Close session with confirmation (when detail panel is open) |
-| `↑` / `↓` | Navigate input history |
-| `Cmd+Shift+H` | Focus huge-mouse from any app (key configurable) |
-| `Escape` | Close popup / refocus textarea |
+| Shortcut                    | Action                                                                  |
+| --------------------------- | ----------------------------------------------------------------------- |
+| `Cmd+Enter` or `Enter`      | Send input (configurable)                                               |
+| `Cmd+↑`                     | Switch to previous pane                                                 |
+| `Cmd+↓`                     | Switch to next pane                                                     |
+| `Ctrl+1-9`                  | Send numbered choice directly (modifier key configurable)               |
+| `Ctrl+H` / `Ctrl+L`         | Switch to previous / next pane                                          |
+| `Ctrl+Cmd+H` / `Ctrl+Cmd+L` | Jump to previous / next session                                         |
+| `Ctrl+P`                    | Open pane content preview / toggle live streaming (key configurable)    |
+| `Ctrl+N`                    | Create a new session (select target tmux session and command)           |
+| `Ctrl+D`                    | Open session detail popup (key configurable)                            |
+| `Ctrl+C`                    | Close session with confirmation (when detail panel is open)             |
+| `Ctrl+G`                    | Open git operations popup (key configurable)                            |
+| `Ctrl+W`                    | Toggle compact mode — shrinks window to tab bar only (key configurable) |
+| `Ctrl+N`                    | Create a new session (select target tmux session and command)           |
+| `/`                         | Open slash command autocomplete (when at start of input)                |
+| `Ctrl+C`                    | Close session with confirmation (when detail panel is open)             |
+| `↑` / `↓`                   | Navigate input history                                                  |
+| `Cmd+Shift+H`               | Focus huge-mouse from any app (key configurable)                        |
+| `Escape`                    | Close popup / refocus textarea                                          |
 
 Popups support vim-style navigation: `j`/`k` (scroll), `d`/`u` (half-page), `g`/`G` (top/bottom), `q` (close).
 

@@ -30,6 +30,7 @@ If there are uncommitted changes, ask the user to commit first or offer to commi
 Read the current version from `package.json`. Suggest the next patch version (e.g., 0.1.1 → 0.1.2) unless the user specifies otherwise.
 
 Version guidelines:
+
 - **Patch** (0.1.x): Bug fixes, minor UI tweaks, small improvements
 - **Minor** (0.x.0): New features, significant UI changes
 - **Major** (x.0.0): Breaking changes (rare at this stage)
@@ -68,6 +69,7 @@ gh run watch <run-id>
 ### 7. macOS code signing note
 
 The CI build uses ad-hoc signing. If the user needs a properly signed macOS build:
+
 1. Build locally with `npm run build:mac`
 2. Upload the DMG to the GitHub release, replacing the CI-built one
 
@@ -76,16 +78,19 @@ The CI build uses ad-hoc signing. If the user needs a properly signed macOS buil
 CI builds use ad-hoc signing which causes Gatekeeper issues. Replace with a locally signed build:
 
 1. Build locally:
+
    ```bash
    npm run build:mac
    ```
 
 2. Find the DMG:
+
    ```bash
    ls dist/*.dmg
    ```
 
 3. Delete the CI-built macOS asset and upload the local one:
+
    ```bash
    # List release assets
    gh release view v<version>
@@ -107,6 +112,7 @@ CI builds use ad-hoc signing which causes Gatekeeper issues. Replace with a loca
 After replacing the DMG, update the Homebrew cask formula:
 
 1. Get the new SHA-256:
+
    ```bash
    shasum -a 256 dist/<local-dmg-filename>
    ```

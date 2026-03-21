@@ -14,6 +14,7 @@ Outdated READMEs mislead users and create friction. Every user-facing change —
 ## When this triggers
 
 After completing implementation work that affects any of:
+
 - Keyboard shortcuts or keybindings
 - UI elements (buttons, settings, toggles)
 - New features or removed features
@@ -26,6 +27,7 @@ After completing implementation work that affects any of:
 ### 1. Identify what changed
 
 Use `git diff` (or the conversation context if uncommitted) to understand what user-facing behavior changed. Focus on:
+
 - New or modified keybindings
 - New or changed settings/preferences
 - Added, removed, or renamed UI elements
@@ -35,6 +37,7 @@ Use `git diff` (or the conversation context if uncommitted) to understand what u
 ### 2. Read current READMEs
 
 Read all README files in the project root:
+
 - `README.md` (English)
 - `README.ja.md` (Japanese) — if it exists
 
@@ -58,6 +61,7 @@ When updating README.ja.md, translate naturally — don't machine-translate lite
 ### 5. Verify consistency
 
 After editing, quickly scan both READMEs to confirm:
+
 - The same features are documented in both
 - Tables have the same rows
 - No stale references to old behavior remain
