@@ -72,11 +72,6 @@ export function DetailOverlay(): React.JSX.Element | null {
           </button>
         </div>
         <div ref={detailContentRef} className="detail-grid">
-          <div className="detail-actions">
-            <button className="git-btn detail-kill-btn" onClick={() => setConfirmKill(true)}>
-              Close Session
-            </button>
-          </div>
           <span className="detail-label">Target</span>
           <span className="detail-value">{paneDetail.target}</span>
           <span className="detail-label">Command</span>
