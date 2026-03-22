@@ -546,7 +546,7 @@ export async function createSession(
   command: 'claude' | 'codex'
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await run(['new-window', '-t', sessionName, command])
+    await run(['new-window', '-a', '-t', sessionName, command])
     return { success: true }
   } catch (e) {
     return { success: false, error: String(e) }
