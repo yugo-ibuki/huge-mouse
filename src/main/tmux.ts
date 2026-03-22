@@ -350,6 +350,14 @@ export async function listPanes(): Promise<TmuxPane[]> {
         else if (/^claude/i.test(pane.command)) pane.command = 'claude'
         return true
       }
+      // Claude Code sets distinctive title prefixes: ✳ (idle) or Braille
+      // spinner characters U+2800-U+28FF (busy). In plan execution mode the
+      // title becomes e.g. "✳ fix-textarea-input-jank" without "claude",
+      // so we detect these prefixes as a Claude Code indicator.
+      if (/^[✳\u2800-\u28FF]/.test(pane.title)) {
+        pane.command = 'claude'
+        return true
+      }
       if (/\b(claude|codex)\b/i.test(pane.title)) {
         // pane_current_command changed to a subprocess (e.g. node).
         // Normalize command so detectStatus routes correctly.
