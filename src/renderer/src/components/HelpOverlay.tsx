@@ -94,7 +94,35 @@ export function HelpOverlay(): React.JSX.Element | null {
         if (e.key === 'Escape' || e.key === 'q') {
           e.preventDefault()
           close()
+          return
         }
+        const el = e.currentTarget.querySelector<HTMLElement>('.help-content')
+        if (!el) return
+        const line = 16
+        const half = el.clientHeight / 2
+        switch (e.key) {
+          case 'j':
+            el.scrollBy(0, line)
+            break
+          case 'k':
+            el.scrollBy(0, -line)
+            break
+          case 'd':
+            el.scrollBy(0, half)
+            break
+          case 'u':
+            el.scrollBy(0, -half)
+            break
+          case 'g':
+            el.scrollTo(0, 0)
+            break
+          case 'G':
+            el.scrollTo(0, el.scrollHeight)
+            break
+          default:
+            return
+        }
+        e.preventDefault()
       }}
     >
       <div className="pane-popup help-popup" onClick={(e) => e.stopPropagation()}>
