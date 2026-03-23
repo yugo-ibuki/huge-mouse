@@ -4,7 +4,7 @@ import { useUiStore } from '../stores/uiStore'
 export function HelpOverlay(): React.JSX.Element | null {
   const helpOpen = useUiStore((s) => s.helpOpen)
   const setHelpOpen = useUiStore((s) => s.setHelpOpen)
-  const { compactKey, previewKey, detailKey, gitKey, focusKey, sendKey, choiceModifier } =
+  const { compactKey, previewKey, detailKey, gitKey, focusKey, sendKey, choiceModifier, stopKey } =
     useSettingsStore.getState()
 
   const close = (): void => {
@@ -51,6 +51,7 @@ export function HelpOverlay(): React.JSX.Element | null {
       title: 'Actions',
       shortcuts: [
         [`${mod}+1-9`, 'Send choice to pane'],
+        [`Ctrl+${stopKey.toUpperCase()}`, 'Stop running session'],
         [`Ctrl+${compactKey.toUpperCase()}`, 'Toggle compact mode'],
         [`Cmd+Shift+${focusKey.toUpperCase()}`, 'Focus from any app']
       ]

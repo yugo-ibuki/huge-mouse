@@ -17,6 +17,7 @@ interface SettingsState {
   sendKey: SendKey
   vimMode: boolean
   compactKey: string
+  stopKey: string
 }
 
 interface SettingsActions {
@@ -32,6 +33,7 @@ interface SettingsActions {
   setSendKey: (value: SendKey) => void
   setVimMode: (value: boolean) => void
   setCompactKey: (value: string) => void
+  setStopKey: (value: string) => void
 }
 
 const STORAGE_KEY = 'unitmux:settings'
@@ -77,6 +79,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set) =>
   sendKey: loadSetting<SendKey>('sendKey', 'cmd+enter'),
   vimMode: loadSetting<boolean>('vimMode', false),
   compactKey: loadSetting<string>('compactKey', 'w'),
+  stopKey: loadSetting<string>('stopKey', 's'),
 
   setAlwaysOnTop: (value) => {
     saveSetting('alwaysOnTop', value)
@@ -140,5 +143,10 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set) =>
   setCompactKey: (value) => {
     saveSetting('compactKey', value)
     set({ compactKey: value })
+  },
+
+  setStopKey: (value) => {
+    saveSetting('stopKey', value)
+    set({ stopKey: value })
   }
 }))

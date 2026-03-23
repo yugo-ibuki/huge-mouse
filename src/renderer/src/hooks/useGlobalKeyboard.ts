@@ -12,7 +12,7 @@ export function useGlobalKeyboard(
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
       const { panes, selected, setSelected } = usePaneStore.getState()
-      const { choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey } =
+      const { choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, stopKey } =
         useSettingsStore.getState()
       const {
         paneContent,
@@ -110,6 +110,22 @@ export function useGlobalKeyboard(
       if (e.ctrlKey && e.key === compactKey && !e.metaKey) {
         e.preventDefault()
         window.api.toggleCompact()
+        return
+      }
+
+      // Ctrl+[stopKey] → send Escape to stop the running session
+      if (e.ctrlKey && e.key === stopKey && !e.metaKey) {
+        e.preventDefault()
+        if (selected) {
+          window.api.stopSession(selected).then((result) => {
+            if (result.success) {
+              setStatus({ message: `Stopped → ${selected}`, ok: true })
+            } else {
+              setStatus({ message: result.error ?? 'Failed to stop', ok: false })
+            }
+            setTimeout(() => setStatus(null), 2000)
+          })
+        }
         return
       }
 

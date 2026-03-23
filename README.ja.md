@@ -69,6 +69,7 @@ brew install --cask yugo-ibuki/tap/unitmux
 | `Ctrl+D`                    | セッション詳細ポップアップを表示（キーは設定で変更可能）                          |
 | `Ctrl+C`                    | セッションを終了（詳細パネル表示中、確認ダイアログあり）                          |
 | `Ctrl+G`                    | git操作ポップアップを表示（キーは設定で変更可能）                                 |
+| `Ctrl+S`                    | セッションの実行を停止 — Escapeを送信して中断（キーは設定で変更可能）             |
 | `Ctrl+W`                    | コンパクトモード切り替え — タブバーだけの細い表示に（キーは設定で変更可能）       |
 | `Ctrl+N`                    | 新しいセッションを作成（tmuxセッションとコマンドを選択）                          |
 | `/`                         | スラッシュコマンドの補完を表示（入力先頭で）                                      |
@@ -108,6 +109,7 @@ brew install --cask yugo-ibuki/tap/unitmux
 - **Choice Key** — 選択肢ショートカットの修飾キーを変更（`Ctrl` または `Cmd`）
 - **Send Key** — 送信キーを `Cmd+Enter` または `Enter` に変更（もう一方が改行になる）
 - **Vim Mode** — Claude CLIのvimエディタモード用にEscape+iのインサートモード切り替えを有効化
+- **Stop Key** — セッション停止のキーを変更（`Ctrl+<キー>`）
 - **Compact Key** — コンパクトモードのキーを変更（`Ctrl+<キー>`）
 - **Preview Key** — プレビュー表示のキーを変更（`Ctrl+<キー>`）
 - **Detail Key** — セッション詳細のキーを変更（`Ctrl+<キー>`）

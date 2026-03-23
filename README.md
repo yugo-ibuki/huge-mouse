@@ -71,6 +71,7 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Ctrl+D`                    | Open session detail popup (key configurable)                            |
 | `Ctrl+C`                    | Close session with confirmation (when detail panel is open)             |
 | `Ctrl+G`                    | Open git operations popup (key configurable)                            |
+| `Ctrl+S`                    | Stop the running session — sends Escape to interrupt (key configurable) |
 | `Ctrl+W`                    | Toggle compact mode — shrinks window to tab bar only (key configurable) |
 | `Ctrl+N`                    | Create a new session (select target tmux session and command)           |
 | `/`                         | Open slash command autocomplete (when at start of input)                |
@@ -110,6 +111,7 @@ Click the gear icon to access settings:
 - **Choice Key** — change the modifier for quick choice shortcuts (`Ctrl` or `Cmd`)
 - **Send Key** — choose between `Cmd+Enter` or `Enter` to send (the other key inserts a newline)
 - **Vim Mode** — enable Escape+i insert mode switch for Claude CLI's vim editor mode
+- **Stop Key** — change the key for stopping a running session (`Ctrl+<key>`)
 - **Compact Key** — change the key for compact mode toggle (`Ctrl+<key>`)
 - **Preview Key** — change the key for pane content preview (`Ctrl+<key>`)
 - **Detail Key** — change the key for session detail popup (`Ctrl+<key>`)

@@ -49,6 +49,23 @@ export const PaneHeader = memo(function PaneHeader(): React.JSX.Element {
                   </span>
                   {p.target.split(':')[1]}
                 </button>
+                {selected === p.target && p.status === 'busy' && (
+                  <button
+                    className="stop-btn"
+                    title="Stop session (Ctrl+S)"
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      const result = await window.api.stopSession(p.target)
+                      if (result.success) {
+                        useUiStore.getState().flashStatus(`Stopped → ${p.target}`, true)
+                      } else {
+                        useUiStore.getState().flashStatus(result.error ?? 'Failed to stop', false)
+                      }
+                    }}
+                  >
+                    ■
+                  </button>
+                )}
                 {p.choices.length > 0 && (
                   <div className="inline-choices">
                     {p.choices.map((c) => (

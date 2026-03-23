@@ -46,6 +46,7 @@ interface TmuxAPI {
   listSkills: (cwd: string) => Promise<{ user: SkillEntry[]; project: SkillEntry[] }>
   listTmuxSessions: () => Promise<string[]>
   createSession: (sessionName: string, command: 'claude' | 'codex') => Promise<SendResult>
+  stopSession: (target: string) => Promise<SendResult>
   killPane: (target: string) => Promise<SendResult>
   sendInput: (target: string, text: string, vimMode?: boolean) => Promise<SendResult>
   capturePane: (target: string) => Promise<string>

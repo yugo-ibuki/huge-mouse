@@ -13,6 +13,7 @@ import {
   gitPush,
   listTmuxSessions,
   createSession,
+  stopSession,
   killPane
 } from './tmux'
 
@@ -163,6 +164,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tmux:create-session', async (_event, { sessionName, command }) => {
     return createSession(sessionName, command)
+  })
+
+  ipcMain.handle('tmux:stop-session', async (_event, target: string) => {
+    return stopSession(target)
   })
 
   ipcMain.handle('tmux:kill-pane', async (_event, target: string) => {

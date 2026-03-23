@@ -561,6 +561,21 @@ export async function createSession(
   }
 }
 
+export async function stopSession(target: string): Promise<{ success: boolean; error?: string }> {
+  if (!TARGET_PATTERN.test(target)) {
+    return { success: false, error: 'Invalid target format' }
+  }
+  try {
+    // Send Escape to interrupt the running process.
+    // Claude CLI: Escape cancels the current operation.
+    // Codex: Escape interrupts (shown as "esc to interrupt").
+    await run(['send-keys', '-t', target, 'Escape'])
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
 export async function killPane(target: string): Promise<{ success: boolean; error?: string }> {
   if (!TARGET_PATTERN.test(target)) {
     return { success: false, error: 'Invalid target format' }
