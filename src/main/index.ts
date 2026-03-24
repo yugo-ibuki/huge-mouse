@@ -236,8 +236,14 @@ app.whenReady().then(() => {
       const win = BrowserWindow.getAllWindows()[0]
       if (win) {
         if (win.isFocused()) {
-          win.blur()
-          if (process.platform === 'darwin') app.hide()
+          if (process.platform === 'darwin') {
+            // Hide app to activate the previous app, then immediately
+            // re-show the window without focus so it stays visible.
+            app.hide()
+            win.showInactive()
+          } else {
+            win.blur()
+          }
         } else {
           if (isCompact) toggleCompact()
           win.show()
