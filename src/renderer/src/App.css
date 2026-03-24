@@ -288,6 +288,30 @@
 }
 
 /* ── Inline choice buttons ── */
+.stop-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: #e55;
+  font-size: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  padding: 0;
+  margin-left: 2px;
+}
+
+.stop-btn:hover {
+  background: #e55;
+  border-color: #e55;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(238, 85, 85, 0.4);
+}
+
 .inline-choices {
   display: inline-flex;
   gap: 1px;
