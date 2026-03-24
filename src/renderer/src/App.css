@@ -746,6 +746,7 @@
   padding: 6px 10px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  -webkit-app-region: drag;
 }
 
 .pane-popup-title {
