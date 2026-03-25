@@ -215,14 +215,21 @@ export function useGlobalKeyboard(
         return
       }
 
-      // Ctrl+N → open create session dialog
+      // Ctrl+N → create new claude session in current pane's session & cwd
       if (e.ctrlKey && e.key === 'n' && !e.metaKey) {
         e.preventDefault()
-        window.api.listTmuxSessions().then((sessions) => {
-          setTmuxSessions(sessions)
-          setNewSessionTarget(sessions[0] ?? '')
-          setNewSessionCommand('claude')
-          setCreateDialog(true)
+        const sessionName = selected ? selected.split(':')[0] : ''
+        if (!sessionName) return
+        const cwd = paneDetail?.cwd
+        window.api.createSession(sessionName, 'claude', cwd).then((r) => {
+          if (r.success) {
+            useUiStore.getState().flashStatus(`Created claude in ${sessionName}`, true)
+            window.api.listSessions().then((result) => {
+              usePaneStore.getState().setPanes(result)
+            })
+          } else {
+            useUiStore.getState().flashStatus(r.error ?? 'Failed', false)
+          }
         })
         return
       }
