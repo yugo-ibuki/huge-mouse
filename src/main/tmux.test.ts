@@ -36,6 +36,36 @@ describe('parseChoices', () => {
     expect(parseChoices(content)).toEqual([])
   })
 
+  it('ignores optional survey with (optional) marker', () => {
+    const content = [
+      'Some question (optional)',
+      '  1: Good    2: Bad   3: Fine'
+    ].join('\n')
+
+    expect(parseChoices(content)).toEqual([])
+  })
+
+  it('ignores survey choices with feedback labels in marker format', () => {
+    const content = [
+      'Rate this response',
+      ' ❯ 1. Bad',
+      '   2. Fine',
+      '   3. Good'
+    ].join('\n')
+
+    expect(parseChoices(content)).toEqual([])
+  })
+
+  it('does not filter actionable choices like Yes/No', () => {
+    const content = ['Do you want to proceed?', ' ❯ 1. Yes', '   2. No'].join('\n')
+
+    const choices = parseChoices(content)
+    expect(choices).toEqual([
+      { number: '1', label: 'Yes' },
+      { number: '2', label: 'No' }
+    ])
+  })
+
   it('detects dot-separated choices with ● marker', () => {
     const content = ['Some prompt text', ' ● 1. Option A', '   2. Option B', '   3. Option C'].join(
       '\n'

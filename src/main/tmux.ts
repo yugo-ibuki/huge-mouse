@@ -139,6 +139,28 @@ const INLINE_CHOICE_PATTERN = /(\d+)[.:)]\s+(\S+)/g
 
 // Session feedback prompt — optional rating, not an actionable choice
 const SESSION_RATING_PATTERN = /how is claude doing/i
+// Broader optional survey detection: "(optional)" marker in surrounding context
+const OPTIONAL_SURVEY_PATTERN = /\(optional\)/i
+// Feedback/rating labels that indicate a survey rather than an actionable choice
+const SURVEY_LABEL_SET = new Set(['bad', 'fine', 'good', 'great', 'dismiss', 'skip'])
+
+// Check if choices are all feedback/rating labels (survey, not actionable)
+function isSurveyChoices(choices: TmuxChoice[]): boolean {
+  return (
+    choices.length > 0 && choices.every((c) => SURVEY_LABEL_SET.has(c.label.toLowerCase()))
+  )
+}
+
+// Check if surrounding lines contain "(optional)" marker
+function hasOptionalContext(lines: string[], centerIndex: number): boolean {
+  // Check up to 3 lines before and 1 line after for "(optional)"
+  const start = Math.max(0, centerIndex - 3)
+  const end = Math.min(lines.length - 1, centerIndex + 1)
+  for (let i = start; i <= end; i++) {
+    if (OPTIONAL_SURVEY_PATTERN.test(lines[i])) return true
+  }
+  return false
+}
 
 function parseChoices(content: string): TmuxChoice[] {
   const allLines = content.split('\n')
@@ -177,13 +199,18 @@ function parseChoices(content: string): TmuxChoice[] {
     // Try inline format first: "  1: Bad    2: Fine   3: Good"
     const inlineMatches = [...line.matchAll(INLINE_CHOICE_PATTERN)]
     if (inlineMatches.length >= 2) {
-      // Skip session rating feedback (not an actionable choice)
+      // Skip optional survey/feedback prompts (not actionable choices)
       const prevLine = li > 0 ? lines[li - 1] : ''
       if (SESSION_RATING_PATTERN.test(prevLine)) continue
+      const inlineCandidates = inlineMatches.map((m) => ({
+        number: m[1],
+        label: m[2].trim()
+      }))
+      if (isSurveyChoices(inlineCandidates) || hasOptionalContext(lines, li)) continue
       // Multiple choices on one line — inline format
       inChoiceBlock = true
-      for (const m of inlineMatches) {
-        choices.push({ number: m[1], label: m[2].trim() })
+      for (const c of inlineCandidates) {
+        choices.push(c)
       }
       continue
     }
@@ -207,6 +234,8 @@ function parseChoices(content: string): TmuxChoice[] {
       }
     }
   }
+  // Filter out survey/feedback choices that appeared in marker/plain format
+  if (isSurveyChoices(choices)) return []
   return choices
 }
 
