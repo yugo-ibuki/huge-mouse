@@ -74,6 +74,7 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Ctrl+S`                    | Stop the running session — sends Escape to interrupt (key configurable) |
 | `Ctrl+W`                    | Toggle compact mode — shrinks window to tab bar only (key configurable) |
 | `Ctrl+N`                    | Create a new session (select target tmux session and command)           |
+| `Ctrl+T`                    | Toggle terminal mode — prefixes input with `!` for shell commands       |
 | `/`                         | Open slash command autocomplete (when at start of input)                |
 | `Ctrl+C`                    | Close session with confirmation (when detail panel is open)             |
 | `↑` / `↓`                   | Navigate input history                                                  |
