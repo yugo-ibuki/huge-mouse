@@ -109,6 +109,13 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+  // Disable default zoom shortcuts — font size is managed by the renderer
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if ((input.meta || input.control) && (input.key === '=' || input.key === '+' || input.key === '-')) {
+      _event.preventDefault()
+    }
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {

@@ -207,6 +207,20 @@ export function useGlobalKeyboard(
         }
       }
 
+      // Cmd+Plus / Cmd+Minus → adjust font size
+      if (e.metaKey && !e.ctrlKey && (e.key === '=' || e.key === '+')) {
+        e.preventDefault()
+        const { fontSize, setFontSize } = useSettingsStore.getState()
+        setFontSize(Math.min(fontSize + 1, 24))
+        return
+      }
+      if (e.metaKey && !e.ctrlKey && e.key === '-') {
+        e.preventDefault()
+        const { fontSize, setFontSize } = useSettingsStore.getState()
+        setFontSize(Math.max(fontSize - 1, 8))
+        return
+      }
+
       // Ctrl+, → toggle help overlay
       if (e.ctrlKey && e.key === ',' && !e.metaKey) {
         e.preventDefault()
