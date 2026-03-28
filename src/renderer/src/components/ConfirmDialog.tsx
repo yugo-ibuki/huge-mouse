@@ -12,6 +12,26 @@ export function ConfirmDialog(): React.JSX.Element | null {
 
   if (!confirmKill || !paneDetail) return null
 
+  const doKill = async (): Promise<void> => {
+    const r = await window.api.killPane(paneDetail.target)
+    setConfirmKill(false)
+    setPaneDetail(null)
+    if (r.success) {
+      useUiStore.getState().flashStatus(`Closed ${paneDetail.target}`, true)
+      if (selected === paneDetail.target) setSelected('')
+      const result = await window.api.listSessions()
+      setPanes(result)
+      if (result.length > 0 && !result.find((p) => p.target === selected)) {
+        setSelected(result[0].target)
+      }
+    } else {
+      useUiStore.getState().flashStatus(r.error ?? 'Failed', false)
+    }
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('.textarea')?.focus()
+    })
+  }
+
   return (
     <div
       className="pane-overlay"
@@ -28,6 +48,10 @@ export function ConfirmDialog(): React.JSX.Element | null {
           setConfirmKill(false)
           e.preventDefault()
         }
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          doKill()
+        }
       }}
     >
       <div className="pane-popup detail-popup confirm-popup" onClick={(e) => e.stopPropagation()}>
@@ -40,31 +64,10 @@ export function ConfirmDialog(): React.JSX.Element | null {
           </p>
           <div className="confirm-actions">
             <button className="git-btn" onClick={() => setConfirmKill(false)}>
-              Cancel
+              Cancel <span className="shortcut-hint">Esc</span>
             </button>
-            <button
-              className="git-btn detail-kill-btn"
-              onClick={async () => {
-                const r = await window.api.killPane(paneDetail.target)
-                setConfirmKill(false)
-                setPaneDetail(null)
-                if (r.success) {
-                  useUiStore.getState().flashStatus(`Closed ${paneDetail.target}`, true)
-                  if (selected === paneDetail.target) setSelected('')
-                  const result = await window.api.listSessions()
-                  setPanes(result)
-                  if (result.length > 0 && !result.find((p) => p.target === selected)) {
-                    setSelected(result[0].target)
-                  }
-                } else {
-                  useUiStore.getState().flashStatus(r.error ?? 'Failed', false)
-                }
-                requestAnimationFrame(() => {
-                  document.querySelector<HTMLTextAreaElement>('.textarea')?.focus()
-                })
-              }}
-            >
-              Close
+            <button className="git-btn detail-kill-btn" onClick={doKill}>
+              Close <span className="shortcut-hint">Enter</span>
             </button>
           </div>
         </div>
