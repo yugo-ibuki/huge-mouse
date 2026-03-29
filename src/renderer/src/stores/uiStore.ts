@@ -26,6 +26,7 @@ interface UiState {
   newSessionCommand: 'claude' | 'codex'
   confirmKill: boolean
   helpOpen: boolean
+  shellMode: boolean
 }
 
 interface UiActions {
@@ -43,6 +44,8 @@ interface UiActions {
   setNewSessionCommand: (value: 'claude' | 'codex') => void
   setConfirmKill: (value: boolean) => void
   setHelpOpen: (value: boolean) => void
+  setShellMode: (value: boolean) => void
+  toggleShellMode: () => void
   flashStatus: (message: string, ok: boolean) => void
 }
 
@@ -61,6 +64,7 @@ export const useUiStore = create<UiState & UiActions>((set) => ({
   newSessionCommand: 'claude',
   confirmKill: false,
   helpOpen: false,
+  shellMode: false,
 
   setSidebarOpen: (value) => set({ sidebarOpen: value }),
   setCompact: (value) => set({ compact: value }),
@@ -76,6 +80,8 @@ export const useUiStore = create<UiState & UiActions>((set) => ({
   setNewSessionCommand: (value) => set({ newSessionCommand: value }),
   setConfirmKill: (value) => set({ confirmKill: value }),
   setHelpOpen: (value) => set({ helpOpen: value }),
+  setShellMode: (value) => set({ shellMode: value }),
+  toggleShellMode: () => set((s) => ({ shellMode: !s.shellMode })),
 
   flashStatus: (message, ok) => {
     set({ status: { message, ok } })

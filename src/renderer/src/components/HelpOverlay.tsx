@@ -54,6 +54,7 @@ export function HelpOverlay(): React.JSX.Element | null {
         [`${mod}+1-9`, 'Send choice to pane'],
         [`Ctrl+${stopKey.toUpperCase()}`, 'Stop running session'],
         [`Ctrl+${compactKey.toUpperCase()}`, 'Toggle compact mode'],
+        ['Ctrl+B', 'Toggle shell mode'],
         [`Cmd+Shift+${focusKey.toUpperCase()}`, 'Focus from any app']
       ]
     },

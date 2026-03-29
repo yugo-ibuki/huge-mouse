@@ -11,7 +11,7 @@ const USER_SKILLS_CACHE_TIME_KEY = 'unitmux:userSkillsCacheTime'
 export function usePolling(): void {
   const projectSkillCache = useRef<Map<string, { skills: SkillCommand[]; time: number }>>(new Map())
 
-  // Pane polling: every 5 seconds
+  // Pane polling: every 3 seconds
   useEffect(() => {
     const poll = async (): Promise<void> => {
       const result = await window.api.listSessions()
@@ -28,7 +28,7 @@ export function usePolling(): void {
     }
 
     poll()
-    const id = setInterval(poll, 5000)
+    const id = setInterval(poll, 3000)
     return () => clearInterval(id)
   }, [])
 

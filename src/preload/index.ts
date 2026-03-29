@@ -48,6 +48,10 @@ const api = {
   stopSession: (target: string): Promise<SendResult> =>
     ipcRenderer.invoke('tmux:stop-session', target),
   killPane: (target: string): Promise<SendResult> => ipcRenderer.invoke('tmux:kill-pane', target),
+  findShellPane: (session: string): Promise<string | null> =>
+    ipcRenderer.invoke('tmux:find-shell-pane', session),
+  ensureShellPane: (session: string, cwd: string): Promise<{ success: boolean; target?: string; error?: string }> =>
+    ipcRenderer.invoke('tmux:ensure-shell-pane', { session, cwd }),
   gitAdd: (cwd: string): Promise<SendResult> => ipcRenderer.invoke('git:add', cwd),
   gitCommit: (cwd: string, message: string): Promise<SendResult> =>
     ipcRenderer.invoke('git:commit', { cwd, message }),

@@ -1528,3 +1528,14 @@
   color: var(--text-secondary);
   text-align: right;
 }
+
+.shell-mode-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--bg);
+  margin-left: 6px;
+  letter-spacing: 0.5px;
+}

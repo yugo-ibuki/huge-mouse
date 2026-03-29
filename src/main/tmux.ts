@@ -635,6 +635,44 @@ export async function capturePane(target: string): Promise<string> {
   }
 }
 
+export async function findShellPane(session: string): Promise<string | null> {
+  const format = '#{session_name}:#{window_index}.#{pane_index}|#{window_name}'
+  const stdout = await run(['list-panes', '-a', '-F', format])
+  for (const line of stdout.trim().split('\n')) {
+    const [target, windowName] = line.split('|')
+    if (target.startsWith(session + ':') && windowName === 'unitmux-shell') {
+      return target
+    }
+  }
+  return null
+}
+
+export async function ensureShellPane(
+  session: string,
+  cwd: string
+): Promise<{ success: boolean; target?: string; error?: string }> {
+  try {
+    const existing = await findShellPane(session)
+    if (existing) return { success: true, target: existing }
+
+    const currentWindow = await run([
+      'display-message', '-t', session, '-p', '#{window_index}'
+    ]).then((s) => s.trim())
+
+    const args = ['new-window', '-t', session, '-n', 'unitmux-shell']
+    if (cwd) args.push('-c', cwd)
+    await run(args)
+
+    await run(['select-window', '-t', `${session}:${currentWindow}`])
+
+    const target = await findShellPane(session)
+    if (!target) return { success: false, error: 'Shell pane created but not found' }
+    return { success: true, target }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
 // Exported for testing only
 export const _testInternals = {
   parseChoices,

@@ -29,9 +29,6 @@ export function useGlobalKeyboard(
         setConfirmKill,
         createDialog,
         setCreateDialog,
-        setTmuxSessions,
-        setNewSessionTarget,
-        setNewSessionCommand,
         setGitResult
       } = useUiStore.getState()
 
@@ -114,6 +111,13 @@ export function useGlobalKeyboard(
         return
       }
 
+      // Ctrl+B → toggle shell mode
+      if (e.ctrlKey && e.key === 'b' && !e.metaKey) {
+        e.preventDefault()
+        useUiStore.getState().toggleShellMode()
+        return
+      }
+
       // Ctrl+[stopKey] → send Escape to stop the running session
       if (e.ctrlKey && e.key === stopKey && !e.metaKey) {
         e.preventDefault()
@@ -134,21 +138,36 @@ export function useGlobalKeyboard(
       if (e.ctrlKey && e.key === previewKey && !e.metaKey) {
         e.preventDefault()
         if (selected) {
+          const { shellMode } = useUiStore.getState()
+
+          const getTarget = async (): Promise<string | null> => {
+            if (!shellMode) return selected
+            const session = selected.split(':')[0]
+            const detail = await window.api.getPaneDetail(selected)
+            const cwd = detail?.cwd ?? ''
+            const result = await window.api.ensureShellPane(session, cwd)
+            return result.success && result.target ? result.target : null
+          }
+
           if (paneContent === null) {
-            // First press: open static preview
-            window.api.capturePane(selected).then((content) => {
-              useUiStore.getState().setPaneContent(content)
-              requestAnimationFrame(() => {
+            getTarget().then((target) => {
+              if (!target) return
+              window.api.capturePane(target).then((content) => {
+                useUiStore.getState().setPaneContent(content)
                 requestAnimationFrame(() => {
-                  paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+                  requestAnimationFrame(() => {
+                    paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+                  })
                 })
               })
             })
           } else if (!streaming) {
-            // Second press: switch to real-time streaming mode
-            setStreaming(true)
-            streamActiveRef.current = true
-            window.api.startStream(selected)
+            getTarget().then((target) => {
+              if (!target) return
+              setStreaming(true)
+              streamActiveRef.current = true
+              window.api.startStream(target)
+            })
           }
         }
         return

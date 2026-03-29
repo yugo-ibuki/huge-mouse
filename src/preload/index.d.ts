@@ -48,12 +48,11 @@ interface TmuxAPI {
   createSession: (sessionName: string, command: 'claude' | 'codex', cwd?: string) => Promise<SendResult>
   stopSession: (target: string) => Promise<SendResult>
   killPane: (target: string) => Promise<SendResult>
+  findShellPane: (session: string) => Promise<string | null>
+  ensureShellPane: (session: string, cwd: string) => Promise<{ success: boolean; target?: string; error?: string }>
   sendInput: (target: string, text: string, vimMode?: boolean) => Promise<SendResult>
   capturePane: (target: string) => Promise<string>
   getPaneDetail: (target: string) => Promise<PaneDetail | null>
-  listTmuxSessions: () => Promise<string[]>
-  createSession: (sessionName: string, command: 'claude' | 'codex', cwd?: string) => Promise<SendResult>
-  killPane: (target: string) => Promise<SendResult>
   gitAdd: (cwd: string) => Promise<SendResult>
   gitCommit: (cwd: string, message: string) => Promise<SendResult>
   gitPush: (cwd: string) => Promise<SendResult>
