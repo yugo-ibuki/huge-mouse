@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useUiStore } from '../stores/uiStore'
 
 export interface StreamRefs {
@@ -29,5 +29,5 @@ export function useStreaming(): StreamRefs {
     return unsubscribe
   }, [])
 
-  return { streamActiveRef, paneViewerRef, isAtBottomRef }
+  return useMemo(() => ({ streamActiveRef, paneViewerRef, isAtBottomRef }), [])
 }
