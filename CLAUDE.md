@@ -49,11 +49,22 @@ src/renderer/src/  → React UI (browser environment)
 
 - `tmux:list-sessions` → Returns `TmuxPane[]` filtered to panes running `claude` or `codex` only
 - `tmux:send-input` → Sends text to a tmux pane by target (e.g., `session:0.0`), returns `SendResult`
+- `tmux:ensure-shell-pane` → Creates/finds a `unitmux-shell` window in a session, returns target
 
 ### Key Types
 
 - `TmuxPane { target, pid, command, title }` — defined in main/tmux.ts, preload/index.ts, renderer App.tsx
 - `SendResult { success, error? }` — defined in preload/index.ts
+
+### Shell Pane Feature
+
+- Ctrl+B toggles shell mode (sends commands to a shell pane instead of Claude)
+- Shell pane (`unitmux-shell` tmux window) is created on-demand: first send or preview in shell mode
+- Uses the user's default shell (bash, zsh, fish, etc.) — no command specified to `tmux new-window`
+- Identified by `window_name === 'unitmux-shell'`; does not interfere with user-created windows
+- If manually closed, auto-recreated on next send/preview
+- Shell pane is auto-deleted when the session's last claude/codex pane is closed via ConfirmDialog
+- Preview (Ctrl+P) and streaming work for shell pane output when in shell mode
 
 ### UI Behavior
 

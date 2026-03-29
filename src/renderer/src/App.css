@@ -71,7 +71,6 @@
   font-family: var(--font-mono);
   font-size: var(--font-size, 12px);
   font-weight: 500;
-  overflow: hidden;
   -webkit-app-region: drag;
   letter-spacing: 0.02em;
   -webkit-font-smoothing: antialiased;
@@ -91,9 +90,8 @@
   gap: 8px;
   padding: 32px 6px 5px 6px;
   border-bottom: none;
-  flex-shrink: 1;
+  flex-shrink: 0;
   background: var(--bg);
-  overflow: hidden;
   min-height: 56px;
 }
 
@@ -129,8 +127,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  overflow-y: auto;
-  max-height: 72px;
+  overflow-x: hidden;
 }
 
 .session-group {
@@ -288,30 +285,6 @@
 }
 
 /* ── Inline choice buttons ── */
-.stop-btn {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-  background: var(--bg-raised);
-  color: #e55;
-  font-size: 8px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-fast);
-  padding: 0;
-  margin-left: 2px;
-}
-
-.stop-btn:hover {
-  background: #e55;
-  border-color: #e55;
-  color: #fff;
-  box-shadow: 0 0 8px rgba(238, 85, 85, 0.4);
-}
-
 .inline-choices {
   display: inline-flex;
   gap: 1px;
@@ -369,8 +342,8 @@
 .main-area {
   display: flex;
   flex: 1;
-  /* Ensure input area is always visible even when header tabs wrap */
   min-height: 80px;
+  overflow: hidden;
 }
 
 .content {
@@ -380,6 +353,7 @@
   padding: 8px 10px;
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 
 /* ── Prompt box ── */
@@ -473,6 +447,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .send-btn {
@@ -748,10 +723,11 @@
   background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
+  -webkit-app-region: drag;
+  outline: none;
   justify-content: center;
   z-index: 100;
   animation: overlay-in 0.15s ease;
-  -webkit-app-region: no-drag;
 }
 
 .pane-popup {
@@ -764,6 +740,7 @@
   flex-direction: column;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   animation: popup-in 0.15s ease;
+  -webkit-app-region: no-drag;
 }
 
 .pane-popup-header {
@@ -1038,6 +1015,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .textarea-wrapper .textarea {
@@ -1527,4 +1505,15 @@
   font-size: 11px;
   color: var(--text-secondary);
   text-align: right;
+}
+
+.shell-mode-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--bg);
+  margin-left: 6px;
+  letter-spacing: 0.5px;
 }

@@ -13,7 +13,7 @@ export function useGlobalKeyboard(
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
       const { panes, selected, setSelected } = usePaneStore.getState()
-      const { choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, stopKey } =
+      const { choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey } =
         useSettingsStore.getState()
       const {
         paneContent,
@@ -29,9 +29,6 @@ export function useGlobalKeyboard(
         setConfirmKill,
         createDialog,
         setCreateDialog,
-        setTmuxSessions,
-        setNewSessionTarget,
-        setNewSessionCommand,
         setGitResult
       } = useUiStore.getState()
 
@@ -114,41 +111,48 @@ export function useGlobalKeyboard(
         return
       }
 
-      // Ctrl+[stopKey] → send Escape to stop the running session
-      if (e.ctrlKey && e.key === stopKey && !e.metaKey) {
+      // Ctrl+B → toggle shell mode
+      if (e.ctrlKey && e.key === 'b' && !e.metaKey) {
         e.preventDefault()
-        if (selected) {
-          window.api.stopSession(selected).then((result) => {
-            if (result.success) {
-              setStatus({ message: `Stopped → ${selected}`, ok: true })
-            } else {
-              setStatus({ message: result.error ?? 'Failed to stop', ok: false })
-            }
-            setTimeout(() => setStatus(null), 2000)
-          })
-        }
+        useUiStore.getState().toggleShellMode()
         return
       }
+
 
       // Ctrl+[previewKey] → 1st press: static capture, 2nd press: start streaming
       if (e.ctrlKey && e.key === previewKey && !e.metaKey) {
         e.preventDefault()
         if (selected) {
+          const { shellMode } = useUiStore.getState()
+
+          const getTarget = async (): Promise<string | null> => {
+            if (!shellMode) return selected
+            const session = selected.split(':')[0]
+            const detail = await window.api.getPaneDetail(selected)
+            const cwd = detail?.cwd ?? ''
+            const result = await window.api.ensureShellPane(session, cwd)
+            return result.success && result.target ? result.target : null
+          }
+
           if (paneContent === null) {
-            // First press: open static preview
-            window.api.capturePane(selected).then((content) => {
-              useUiStore.getState().setPaneContent(content)
-              requestAnimationFrame(() => {
+            getTarget().then((target) => {
+              if (!target) return
+              window.api.capturePane(target).then((content) => {
+                useUiStore.getState().setPaneContent(content)
                 requestAnimationFrame(() => {
-                  paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+                  requestAnimationFrame(() => {
+                    paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+                  })
                 })
               })
             })
           } else if (!streaming) {
-            // Second press: switch to real-time streaming mode
-            setStreaming(true)
-            streamActiveRef.current = true
-            window.api.startStream(selected)
+            getTarget().then((target) => {
+              if (!target) return
+              setStreaming(true)
+              streamActiveRef.current = true
+              window.api.startStream(target)
+            })
           }
         }
         return

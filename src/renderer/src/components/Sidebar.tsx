@@ -26,14 +26,11 @@ export function Sidebar(): React.JSX.Element {
   const setDetailKey = useSettingsStore((s) => s.setDetailKey)
   const gitKey = useSettingsStore((s) => s.gitKey)
   const setGitKey = useSettingsStore((s) => s.setGitKey)
-  const stopKey = useSettingsStore((s) => s.stopKey)
-  const setStopKey = useSettingsStore((s) => s.setStopKey)
   const focusKey = useSettingsStore((s) => s.focusKey)
   const setFocusKey = useSettingsStore((s) => s.setFocusKey)
 
   const sidebarOpen = useUiStore((s) => s.sidebarOpen)
 
-  const [editingStopKey, setEditingStopKey] = useState(false)
   const [editingCompactKey, setEditingCompactKey] = useState(false)
   const [editingPreviewKey, setEditingPreviewKey] = useState(false)
   const [editingDetailKey, setEditingDetailKey] = useState(false)
@@ -176,32 +173,6 @@ export function Sidebar(): React.JSX.Element {
         ) : (
           <button className="key-display" onClick={() => setEditingCompactKey(true)}>
             Ctrl+{compactKey.toUpperCase()}
-          </button>
-        )}
-      </label>
-      <label className="setting-row">
-        <span className="setting-label">Stop Key</span>
-        {editingStopKey ? (
-          <span
-            className="key-capture"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              e.preventDefault()
-              if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
-                setStopKey(e.key.toLowerCase())
-                setEditingStopKey(false)
-              }
-              if (e.key === 'Escape') {
-                setEditingStopKey(false)
-              }
-            }}
-            ref={(el) => el?.focus()}
-          >
-            Press a key...
-          </span>
-        ) : (
-          <button className="key-display" onClick={() => setEditingStopKey(true)}>
-            Ctrl+{stopKey.toUpperCase()}
           </button>
         )}
       </label>

@@ -25,13 +25,12 @@ interface InputAreaProps {
 }
 
 export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
-  const text = useInputStore((s) => s.text)
-  const terminalMode = useInputStore((s) => s.terminalMode)
   const slashFilter = useInputStore((s) => s.slashFilter)
   const slashIndex = useInputStore((s) => s.slashIndex)
   const slashCommands = useInputStore((s) => s.slashCommands)
   const skillCommands = useInputStore((s) => s.skillCommands)
   const sendKey = useSettingsStore((s) => s.sendKey)
+  const shellMode = useUiStore((s) => s.shellMode)
 
   const allCommands = useMemo(
     () => [
@@ -52,7 +51,9 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
   const applySlashCommand = useCallback(
     (cmd: SlashCommand | SkillCommand) => {
       const isSkill = 'source' in cmd
-      useInputStore.getState().setText(isSkill ? `/${cmd.name}` : cmd.body)
+      const val = isSkill ? `/${cmd.name}` : cmd.body
+      if (textareaRef.current) textareaRef.current.value = val
+      useInputStore.getState().setText(val)
       useInputStore.getState().setSlashFilter(null)
       useInputStore.getState().setSlashIndex(0)
       requestAnimationFrame(() => textareaRef.current?.focus())
@@ -61,24 +62,45 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
   )
 
   const send = useCallback(async () => {
-    const { text: currentText, terminalMode } = useInputStore.getState()
+    const currentText = textareaRef.current?.value ?? ''
     const { selected: currentSelected } = usePaneStore.getState()
     if (!currentSelected || !currentText.trim()) return
 
-    const currentVimMode = useSettingsStore.getState().vimMode
-    // In terminal mode, prefix with ! so Claude treats it as a shell command
-    const sent = terminalMode ? `! ${currentText}` : currentText
-    const result = await window.api.sendInput(currentSelected, sent, currentVimMode)
-    if (result.success) {
-      useInputStore.getState().pushHistory(sent)
-      useInputStore.getState().setText('')
-      const firstLine = sent.split('\n')[0].slice(0, 60)
-      usePaneStore.getState().updateLastPrompt(currentSelected, firstLine)
-      useUiStore.getState().flashStatus('Sent!', true)
+    const { shellMode: isShell } = useUiStore.getState()
+
+    if (isShell) {
+      const session = currentSelected.split(':')[0]
+      const detail = await window.api.getPaneDetail(currentSelected)
+      const cwd = detail?.cwd ?? ''
+      const result = await window.api.ensureShellPane(session, cwd)
+      if (!result.success || !result.target) {
+        useUiStore.getState().flashStatus(result.error ?? 'Failed to create shell pane', false)
+        return
+      }
+      const sendResult = await window.api.sendInput(result.target, currentText)
+      if (sendResult.success) {
+        useInputStore.getState().pushHistory(currentText)
+        if (textareaRef.current) textareaRef.current.value = ''
+        useInputStore.getState().setText('')
+        useUiStore.getState().flashStatus('Sent to shell!', true)
+      } else {
+        useUiStore.getState().flashStatus(sendResult.error ?? 'Failed', false)
+      }
     } else {
-      useUiStore.getState().flashStatus(result.error ?? 'Failed', false)
+      const currentVimMode = useSettingsStore.getState().vimMode
+      const result = await window.api.sendInput(currentSelected, currentText, currentVimMode)
+      if (result.success) {
+        useInputStore.getState().pushHistory(currentText)
+        if (textareaRef.current) textareaRef.current.value = ''
+        useInputStore.getState().setText('')
+        const firstLine = currentText.split('\n')[0].slice(0, 60)
+        usePaneStore.getState().updateLastPrompt(currentSelected, firstLine)
+        useUiStore.getState().flashStatus('Sent!', true)
+      } else {
+        useUiStore.getState().flashStatus(result.error ?? 'Failed', false)
+      }
     }
-  }, [])
+  }, [textareaRef])
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -159,10 +181,10 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
           const start = ta.selectionStart
           const end = ta.selectionEnd
           const val = ta.value
-          store.setText(val.substring(0, start) + '\n' + val.substring(end))
-          requestAnimationFrame(() => {
-            ta.selectionStart = ta.selectionEnd = start + 1
-          })
+          const newVal = val.substring(0, start) + '\n' + val.substring(end)
+          ta.value = newVal
+          ta.selectionStart = ta.selectionEnd = start + 1
+          store.setText(newVal)
           return
         }
       }
@@ -174,9 +196,12 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
         const isAtTop = !ta.value.includes('\n') || ta.selectionStart === 0
         if (isAtTop) {
           e.preventDefault()
-          const currentText = useInputStore.getState().text
+          const currentText = ta.value
           const next = useInputStore.getState().navigateHistory('up', currentText)
-          if (next !== null) useInputStore.getState().setText(next)
+          if (next !== null) {
+            ta.value = next
+            useInputStore.getState().setText(next)
+          }
         }
       }
       if (e.key === 'ArrowDown' && !e.metaKey && historyIndex >= 0) {
@@ -184,9 +209,12 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
         const isAtBottom = !ta.value.includes('\n') || ta.selectionStart === ta.value.length
         if (isAtBottom) {
           e.preventDefault()
-          const currentText = useInputStore.getState().text
+          const currentText = ta.value
           const next = useInputStore.getState().navigateHistory('down', currentText)
-          if (next !== null) useInputStore.getState().setText(next)
+          if (next !== null) {
+            ta.value = next
+            useInputStore.getState().setText(next)
+          }
         }
       }
     },
@@ -196,17 +224,15 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
   return (
     <>
       <div className="textarea-wrapper">
-        {terminalMode && <div className="terminal-mode-badge">TERMINAL</div>}
         <textarea
           ref={textareaRef}
-          className={`textarea${terminalMode ? ' terminal-mode' : ''}`}
+          className="textarea"
           rows={5}
           placeholder={
-            terminalMode
-              ? `! command... (Ctrl+T to exit terminal mode)`
+            shellMode
+              ? 'Type shell command... (Enter to send)'
               : `Type input to send... (${sendKey === 'cmd+enter' ? 'Cmd+Enter' : 'Enter'} to send)`
           }
-          value={text}
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
         />

@@ -80,11 +80,12 @@ function App(): React.JSX.Element {
     <div className="layout">
       <PaneHeader />
 
-      {lastPrompts[selected] && <div className="last-prompt-bar">{lastPrompts[selected]}</div>}
-
       {!compact && (
         <div className="main-area">
           <div className="content">
+            {lastPrompts[selected] && (
+              <div className="last-prompt-bar">{lastPrompts[selected]}</div>
+            )}
             {selectedPrompt && (
               <div className="prompt-box">
                 <pre className="prompt-text">{selectedPrompt}</pre>
