@@ -146,9 +146,7 @@ const SURVEY_LABEL_SET = new Set(['bad', 'fine', 'good', 'great', 'dismiss', 'sk
 
 // Check if choices are all feedback/rating labels (survey, not actionable)
 function isSurveyChoices(choices: TmuxChoice[]): boolean {
-  return (
-    choices.length > 0 && choices.every((c) => SURVEY_LABEL_SET.has(c.label.toLowerCase()))
-  )
+  return choices.length > 0 && choices.every((c) => SURVEY_LABEL_SET.has(c.label.toLowerCase()))
 }
 
 // Check if surrounding lines contain "(optional)" marker
@@ -416,35 +414,47 @@ const TARGET_PATTERN = /^[a-zA-Z0-9_-]+:\d+\.\d+$/
 export async function sendInput(
   target: string,
   text: string,
-  vimMode = false
+  vimMode = false,
+  paneStatus?: PaneStatus,
+  paneCommand?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!TARGET_PATTERN.test(target)) {
     return { success: false, error: 'Invalid target format' }
   }
 
   try {
-    // Detect if the pane is showing choices (waiting state).
-    // When choices are visible and input is a single digit (1-9),
-    // skip insert mode switch since choices work in normal mode.
-    const content = await capturePaneContent(target)
-    const titleAndCmd = await run([
-      'display-message',
-      '-t',
-      target,
-      '-p',
-      '#{pane_title}|#{pane_current_command}'
-    ])
-    const [title, command] = titleAndCmd.trim().split('|')
-    const { status } = detectStatus(title, content, command)
+    let status: PaneStatus
+    let command: string
+
+    if (paneStatus && paneCommand) {
+      // Use caller-provided status/command to avoid redundant tmux queries
+      status = paneStatus
+      command = paneCommand
+    } else {
+      // Fallback: detect from tmux (slower path for shell pane etc.)
+      const content = await capturePaneContent(target)
+      const titleAndCmd = await run([
+        'display-message',
+        '-t',
+        target,
+        '-p',
+        '#{pane_title}|#{pane_current_command}'
+      ])
+      const [title, cmd] = titleAndCmd.trim().split('|')
+      const detected = detectStatus(title, content, cmd)
+      status = detected.status
+      command = cmd
+    }
+
     const isChoiceResponse = status === 'waiting' && /^[1-9]$/.test(text)
 
     // Only send Escape+i when Claude CLI is in vim input mode.
     // In native (readline) mode, Escape+i would type a literal "i".
     if (!isChoiceResponse && vimMode) {
       await run(['send-keys', '-t', target, 'Escape'])
-      await new Promise((r) => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 20))
       await run(['send-keys', '-t', target, 'i'])
-      await new Promise((r) => setTimeout(r, 100))
+      await new Promise((r) => setTimeout(r, 30))
     }
 
     const isCodex = command === 'codex'
@@ -461,7 +471,7 @@ export async function sendInput(
       await run(['send-keys', '-t', target, '\x1b[200~'])
       await run(['send-keys', '-t', target, '-l', trimmed])
       await run(['send-keys', '-t', target, '\x1b[201~'])
-      await new Promise((r) => setTimeout(r, 300))
+      await new Promise((r) => setTimeout(r, 100))
       await run(['send-keys', '-t', target, '', 'Enter'])
     } else {
       await run(['send-keys', '-t', target, '-l', text])
@@ -594,7 +604,6 @@ export async function createSession(
   }
 }
 
-
 export async function killPane(target: string): Promise<{ success: boolean; error?: string }> {
   if (!TARGET_PATTERN.test(target)) {
     return { success: false, error: 'Invalid target format' }
@@ -642,7 +651,11 @@ export async function ensureShellPane(
     if (existing) return { success: true, target: existing }
 
     const currentWindow = await run([
-      'display-message', '-t', session, '-p', '#{window_index}'
+      'display-message',
+      '-t',
+      session,
+      '-p',
+      '#{window_index}'
     ]).then((s) => s.trim())
 
     const args = ['new-window', '-t', session, '-n', 'unitmux-shell']

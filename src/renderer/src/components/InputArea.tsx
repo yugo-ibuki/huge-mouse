@@ -89,7 +89,14 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
       }
     } else {
       const currentVimMode = useSettingsStore.getState().vimMode
-      const result = await window.api.sendInput(currentSelected, currentText, currentVimMode)
+      const pane = usePaneStore.getState().panes.find((p) => p.target === currentSelected)
+      const result = await window.api.sendInput(
+        currentSelected,
+        currentText,
+        currentVimMode,
+        pane?.status,
+        pane?.command
+      )
       if (result.success) {
         useInputStore.getState().pushHistory(currentText)
         if (textareaRef.current) textareaRef.current.value = ''
@@ -103,27 +110,22 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
     }
   }, [textareaRef])
 
-  const handleTextChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const val = e.target.value
-      const store = useInputStore.getState()
-      store.setText(val)
-      const cmds = [
-        ...store.slashCommands,
-        ...store.skillCommands.filter(
-          (sk) => !store.slashCommands.some((uc) => uc.name === sk.name)
-        )
-      ]
-      const match = val.match(/^\/(\S*)$/)
-      if (match && cmds.length > 0) {
-        store.setSlashFilter(match[1])
-        store.setSlashIndex(0)
-      } else {
-        store.setSlashFilter(null)
-      }
-    },
-    []
-  )
+  const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    const store = useInputStore.getState()
+    store.setText(val)
+    const cmds = [
+      ...store.slashCommands,
+      ...store.skillCommands.filter((sk) => !store.slashCommands.some((uc) => uc.name === sk.name))
+    ]
+    const match = val.match(/^\/(\S*)$/)
+    if (match && cmds.length > 0) {
+      store.setSlashFilter(match[1])
+      store.setSlashIndex(0)
+    } else {
+      store.setSlashFilter(null)
+    }
+  }, [])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

@@ -35,20 +35,33 @@ export interface SendResult {
 
 const api = {
   listSessions: (): Promise<TmuxPane[]> => ipcRenderer.invoke('tmux:list-sessions'),
-  sendInput: (target: string, text: string, vimMode = false): Promise<SendResult> =>
-    ipcRenderer.invoke('tmux:send-input', { target, text, vimMode }),
+  sendInput: (
+    target: string,
+    text: string,
+    vimMode = false,
+    paneStatus?: string,
+    paneCommand?: string
+  ): Promise<SendResult> =>
+    ipcRenderer.invoke('tmux:send-input', { target, text, vimMode, paneStatus, paneCommand }),
   capturePane: (target: string): Promise<string> => ipcRenderer.invoke('tmux:capture-pane', target),
   getPaneDetail: (target: string): Promise<PaneDetail | null> =>
     ipcRenderer.invoke('tmux:pane-detail', target),
   listSkills: (cwd: string): Promise<{ user: SkillEntry[]; project: SkillEntry[] }> =>
     ipcRenderer.invoke('skills:list', cwd),
   listTmuxSessions: (): Promise<string[]> => ipcRenderer.invoke('tmux:list-tmux-sessions'),
-  createSession: (sessionName: string, command: 'claude' | 'codex', cwd?: string): Promise<SendResult> =>
+  createSession: (
+    sessionName: string,
+    command: 'claude' | 'codex',
+    cwd?: string
+  ): Promise<SendResult> =>
     ipcRenderer.invoke('tmux:create-session', { sessionName, command, cwd }),
   killPane: (target: string): Promise<SendResult> => ipcRenderer.invoke('tmux:kill-pane', target),
   findShellPane: (session: string): Promise<string | null> =>
     ipcRenderer.invoke('tmux:find-shell-pane', session),
-  ensureShellPane: (session: string, cwd: string): Promise<{ success: boolean; target?: string; error?: string }> =>
+  ensureShellPane: (
+    session: string,
+    cwd: string
+  ): Promise<{ success: boolean; target?: string; error?: string }> =>
     ipcRenderer.invoke('tmux:ensure-shell-pane', { session, cwd }),
   gitAdd: (cwd: string): Promise<SendResult> => ipcRenderer.invoke('git:add', cwd),
   gitCommit: (cwd: string, message: string): Promise<SendResult> =>

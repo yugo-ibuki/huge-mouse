@@ -155,7 +155,11 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // Sending flag: when true, polling defers to avoid competing with sendInput
+  let sending = false
+
   ipcMain.handle('tmux:list-sessions', async () => {
+    if (sending) return [] // defer — renderer will retry on next poll cycle
     try {
       return await listPanes()
     } catch {
@@ -163,9 +167,17 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle('tmux:send-input', async (_event, { target, text, vimMode }) => {
-    return sendInput(target, text, vimMode)
-  })
+  ipcMain.handle(
+    'tmux:send-input',
+    async (_event, { target, text, vimMode, paneStatus, paneCommand }) => {
+      sending = true
+      try {
+        return await sendInput(target, text, vimMode, paneStatus, paneCommand)
+      } finally {
+        sending = false
+      }
+    }
+  )
 
   ipcMain.handle('tmux:capture-pane', async (_event, target: string) => {
     return capturePane(target)

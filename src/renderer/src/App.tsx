@@ -96,9 +96,11 @@ function App(): React.JSX.Element {
                         key={c.number}
                         className="prompt-choice-btn"
                         onClick={async () => {
-                          const sel = usePaneStore.getState().selected
+                          const state = usePaneStore.getState()
+                          const sel = state.selected
+                          const pane = state.panes.find((p) => p.target === sel)
                           const vm = useSettingsStore.getState().vimMode
-                          await window.api.sendInput(sel, c.number, vm)
+                          await window.api.sendInput(sel, c.number, vm, pane?.status, pane?.command)
                           useUiStore.getState().flashStatus(`Sent ${c.number} → ${sel}`, true)
                         }}
                         onKeyDown={(e) => {

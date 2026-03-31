@@ -91,14 +91,16 @@ export function useGlobalKeyboard(
           const choice = pane.choices.find((c) => c.number === digitStr)
           if (choice) {
             e.preventDefault()
-            window.api.sendInput(pane.target, choice.number, vimMode).then((result) => {
-              if (result.success) {
-                setStatus({ message: `Sent ${choice.number} → ${pane.target}`, ok: true })
-              } else {
-                setStatus({ message: result.error ?? 'Failed', ok: false })
-              }
-              setTimeout(() => setStatus(null), 2000)
-            })
+            window.api
+              .sendInput(pane.target, choice.number, vimMode, pane.status, pane.command)
+              .then((result) => {
+                if (result.success) {
+                  setStatus({ message: `Sent ${choice.number} → ${pane.target}`, ok: true })
+                } else {
+                  setStatus({ message: result.error ?? 'Failed', ok: false })
+                }
+                setTimeout(() => setStatus(null), 2000)
+              })
           }
         }
       }
@@ -116,7 +118,6 @@ export function useGlobalKeyboard(
         useUiStore.getState().toggleShellMode()
         return
       }
-
 
       // Ctrl+[previewKey] → 1st press: static capture, 2nd press: start streaming
       if (e.ctrlKey && e.key === previewKey && !e.metaKey) {
