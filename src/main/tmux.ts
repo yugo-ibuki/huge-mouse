@@ -1,5 +1,8 @@
 import { execFile } from 'child_process'
 import { existsSync } from 'fs'
+import { readFile, readdir } from 'fs/promises'
+import { homedir } from 'os'
+import { join } from 'path'
 
 export type PaneStatus = 'idle' | 'busy' | 'waiting'
 
@@ -16,6 +19,185 @@ export interface TmuxPane {
   status: PaneStatus
   choices: TmuxChoice[]
   prompt: string
+}
+
+// Strip ANSI escape sequences from captured pane content.
+// capture-pane -p normally strips them, but FLICK (alternate screen) mode
+// can leave CSI / OSC remnants in certain tmux versions.
+const ESC = String.fromCharCode(0x1b)
+const BEL = String.fromCharCode(0x07)
+const RE_CSI = new RegExp(ESC + '\\[[0-9;]*[A-Za-z]', 'g')
+const RE_OSC = new RegExp(ESC + '\\][^' + BEL + ESC + ']*(?:' + BEL + '|' + ESC + '\\\\)', 'g')
+const RE_CHARSET = new RegExp(ESC + '[()][AB012]', 'g')
+const RE_MODE = new RegExp(ESC + '[>=]', 'g')
+
+function stripAnsi(text: string): string {
+  return text.replace(RE_CSI, '').replace(RE_OSC, '').replace(RE_CHARSET, '').replace(RE_MODE, '')
+}
+
+// Detect if a pane is currently showing the alternate screen buffer
+// (i.e. Claude Code is running in FLICK / NO_FLICKER mode).
+async function isAlternateScreen(target: string): Promise<boolean> {
+  try {
+    const result = await run(['display-message', '-t', target, '-p', '#{alternate_on}'])
+    return result.trim() === '1'
+  } catch {
+    return false
+  }
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+  timestamp: string
+}
+
+const TOOL_ICONS: Record<string, string> = {
+  Read: '\u{1F4C4}',
+  Edit: '\u{270F}\u{FE0F}',
+  Write: '\u{1F4DD}',
+  Bash: '\u{1F4BB}',
+  Grep: '\u{1F50D}',
+  Glob: '\u{1F4C2}',
+  Agent: '\u{1F916}',
+  WebFetch: '\u{1F310}',
+  WebSearch: '\u{1F50E}',
+  TodoWrite: '\u{1F4CB}'
+}
+
+function encodeCwd(cwd: string): string {
+  return cwd.replace(/[/.]/g, '-')
+}
+
+async function findSessionJsonl(target: string): Promise<string | null> {
+  try {
+    const info = await run([
+      'display-message',
+      '-t',
+      target,
+      '-p',
+      '#{pane_pid}|#{pane_current_path}'
+    ])
+    const [pid, cwd] = info.trim().split('|')
+
+    const claudeDir = join(homedir(), '.claude')
+    const sessionsDir = join(claudeDir, 'sessions')
+
+    // Try direct PID match
+    try {
+      const data = JSON.parse(await readFile(join(sessionsDir, `${pid}.json`), 'utf-8'))
+      const jsonlPath = join(claudeDir, 'projects', encodeCwd(data.cwd), `${data.sessionId}.jsonl`)
+      if (existsSync(jsonlPath)) return jsonlPath
+    } catch {
+      // PID doesn't match directly
+    }
+
+    // Scan session files for matching CWD, pick most recent
+    try {
+      const files = await readdir(sessionsDir)
+      let best: { path: string; startedAt: number } | null = null
+
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue
+        try {
+          const data = JSON.parse(await readFile(join(sessionsDir, file), 'utf-8'))
+          if (data.cwd === cwd) {
+            const jsonlPath = join(
+              claudeDir,
+              'projects',
+              encodeCwd(data.cwd),
+              `${data.sessionId}.jsonl`
+            )
+            if (existsSync(jsonlPath) && (!best || data.startedAt > best.startedAt)) {
+              best = { path: jsonlPath, startedAt: data.startedAt }
+            }
+          }
+        } catch {
+          /* skip */
+        }
+      }
+      return best?.path ?? null
+    } catch {
+      return null
+    }
+  } catch {
+    return null
+  }
+}
+
+function formatToolUse(block: { name?: string; input?: Record<string, string> }): string {
+  const name = block.name ?? 'Tool'
+  const icon = TOOL_ICONS[name] ?? '\u{1F527}'
+  const input = block.input ?? {}
+
+  if ((name === 'Read' || name === 'Edit' || name === 'Write') && input.file_path) {
+    return `${icon} ${name} ${input.file_path.split('/').pop()}`
+  }
+  if (name === 'Bash' && input.command) {
+    return `${icon} ${input.command.slice(0, 60)}`
+  }
+  if (name === 'Grep' && input.pattern) {
+    return `${icon} Grep "${input.pattern.slice(0, 40)}"`
+  }
+  return `${icon} ${name}`
+}
+
+export async function getConversationLog(target: string): Promise<ChatMessage[]> {
+  const jsonlPath = await findSessionJsonl(target)
+  if (!jsonlPath) return []
+
+  try {
+    const raw = await readFile(jsonlPath, 'utf-8')
+    const messages: ChatMessage[] = []
+
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const record = JSON.parse(line)
+
+        if (record.type === 'user' && record.message?.role === 'user') {
+          const text =
+            typeof record.message.content === 'string' ? record.message.content.trim() : ''
+          if (text) {
+            messages.push({ role: 'user', text, timestamp: record.timestamp ?? '' })
+          }
+        } else if (record.type === 'assistant' && record.message?.role === 'assistant') {
+          const blocks = record.message.content
+          if (!Array.isArray(blocks)) continue
+
+          const parts: string[] = []
+          for (const block of blocks) {
+            if (block.type === 'text' && block.text?.trim()) {
+              parts.push(block.text.trim())
+            } else if (block.type === 'tool_use') {
+              parts.push(formatToolUse(block))
+            }
+          }
+
+          if (parts.length > 0) {
+            const last = messages[messages.length - 1]
+            if (last?.role === 'assistant') {
+              // Merge consecutive assistant messages (same turn)
+              last.text += '\n' + parts.join('\n')
+              last.timestamp = record.timestamp ?? last.timestamp
+            } else {
+              messages.push({
+                role: 'assistant',
+                text: parts.join('\n'),
+                timestamp: record.timestamp ?? ''
+              })
+            }
+          }
+        }
+      } catch {
+        /* skip malformed lines */
+      }
+    }
+
+    return messages
+  } catch {
+    return []
+  }
 }
 
 const TMUX_PATHS = ['/opt/homebrew/bin/tmux', '/usr/local/bin/tmux', '/usr/bin/tmux']
@@ -121,7 +303,8 @@ const WAITING_PATTERNS = [
 
 async function capturePaneContent(target: string): Promise<string> {
   try {
-    return await run(['capture-pane', '-t', target, '-p'])
+    const output = await run(['capture-pane', '-t', target, '-p'])
+    return stripAnsi(output)
   } catch {
     return ''
   }
@@ -608,14 +791,53 @@ export async function killPane(target: string): Promise<{ success: boolean; erro
 }
 
 function trimCliFooter(output: string): string {
-  return output
+  const lines = output.split('\n')
+
+  // Strip trailing empty lines
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+    lines.pop()
+  }
+
+  // Strip CLI footer lines from the bottom: separator, session/model info,
+  // prompt cursor, mode indicator, token/cost counters (FLICK mode).
+  while (lines.length > 0) {
+    const last = lines[lines.length - 1]
+    if (
+      /─{5,}/.test(last) ||
+      /^\s*(Session|Model)\b/.test(last) ||
+      /^\s*❯\s*$/.test(last) ||
+      /\b(plan|compact) mode\b/.test(last) ||
+      // FLICK mode renders token/cost counters and message counts in the footer
+      /\d+\s*tokens?\b/i.test(last) ||
+      /\$[\d.]+\s*(cost|spent)/i.test(last) ||
+      // Keybinding hints that appear at the bottom of FLICK TUI
+      /^\s*(Ctrl|Esc|Enter)\b.*\b(send|cancel|submit|menu)\b/i.test(last) ||
+      // Empty input area indicator
+      /^\s*>\s*$/.test(last)
+    ) {
+      lines.pop()
+      while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+        lines.pop()
+      }
+    } else {
+      break
+    }
+  }
+
+  return lines.join('\n')
 }
 
 export async function capturePane(target: string): Promise<string> {
   if (!TARGET_PATTERN.test(target)) return ''
   try {
-    const output = await run(['capture-pane', '-t', target, '-p', '-S', '-500'])
-    return trimCliFooter(output)
+    const altScreen = await isAlternateScreen(target)
+    // Alternate screen (FLICK / NO_FLICKER mode) has no scrollback history,
+    // so -S -500 is useless. Just capture the current visible screen.
+    const args = altScreen
+      ? ['capture-pane', '-t', target, '-p']
+      : ['capture-pane', '-t', target, '-p', '-S', '-500']
+    const output = await run(args)
+    return trimCliFooter(stripAnsi(output))
   } catch {
     return ''
   }
@@ -663,5 +885,6 @@ export async function ensureShellPane(
 export const _testInternals = {
   parseChoices,
   detectStatusClaude,
-  trimCliFooter
+  trimCliFooter,
+  stripAnsi
 }

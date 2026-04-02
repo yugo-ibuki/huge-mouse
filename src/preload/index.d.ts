@@ -36,6 +36,12 @@ interface PaneDetail {
   sessionId: string
 }
 
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+  timestamp: string
+}
+
 interface SendResult {
   success: boolean
   error?: string
@@ -66,9 +72,11 @@ interface TmuxAPI {
   toggleCompact: () => Promise<boolean>
   onCompactChanged: (callback: (compact: boolean) => void) => () => void
   onFocusTextarea: (callback: () => void) => () => void
-  startStream: (target: string) => Promise<boolean>
+  getConversationLog: (target: string) => Promise<ChatMessage[]>
+  startStream: (target: string, mode?: 'raw' | 'chat') => Promise<boolean>
   stopStream: () => Promise<boolean>
   onStreamData: (callback: (content: string) => void) => () => void
+  onChatData: (callback: (messages: ChatMessage[]) => void) => () => void
 }
 
 declare global {

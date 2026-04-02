@@ -845,6 +845,65 @@
   word-break: break-all;
 }
 
+/* Chat mode styles */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-row {
+  display: flex;
+  width: 100%;
+}
+
+.chat-row-left {
+  justify-content: flex-start;
+}
+
+.chat-row-right {
+  justify-content: flex-end;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: var(--font-size, 12px);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  position: relative;
+}
+
+.chat-bubble-user {
+  background: var(--accent, #3b82f6);
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-bubble-assistant {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text);
+  border-bottom-left-radius: 2px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.chat-tool-line {
+  font-size: 10px;
+  opacity: 0.6;
+  padding: 1px 0;
+}
+
+.chat-timestamp {
+  display: block;
+  font-size: 9px;
+  opacity: 0.5;
+  text-align: right;
+  margin-top: 2px;
+}
+
 @keyframes overlay-in {
   from {
     opacity: 0;

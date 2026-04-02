@@ -39,3 +39,9 @@ export interface TmuxPane {
   choices: TmuxChoice[]
   prompt: string
 }
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+  timestamp: string
+}

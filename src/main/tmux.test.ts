@@ -208,7 +208,7 @@ describe('detectStatusClaude', () => {
 })
 
 describe('trimCliFooter', () => {
-  it('passes content through unchanged', () => {
+  it('strips CLI footer lines (separator, session info, prompt cursor)', () => {
     const content = [
       '⏺ Some response text',
       '',
@@ -220,6 +220,24 @@ describe('trimCliFooter', () => {
     ].join('\n')
 
     const result = trimCliFooter(content)
-    expect(result).toBe(content)
+    expect(result).toBe('⏺ Some response text')
+  })
+
+  it('preserves content when no footer is present', () => {
+    const content = '⏺ Some response text\nMore text here'
+    expect(trimCliFooter(content)).toBe(content)
+  })
+
+  it('strips FLICK mode footer patterns (token counts, cost)', () => {
+    const content = [
+      '⏺ Response',
+      '',
+      '─────────────────────────────────────',
+      '  Session abc | Model opus',
+      '500 tokens',
+      ''
+    ].join('\n')
+
+    expect(trimCliFooter(content)).toBe('⏺ Response')
   })
 })
