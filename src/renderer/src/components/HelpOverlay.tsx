@@ -4,7 +4,7 @@ import { useUiStore } from '../stores/uiStore'
 export function HelpOverlay(): React.JSX.Element | null {
   const helpOpen = useUiStore((s) => s.helpOpen)
   const setHelpOpen = useUiStore((s) => s.setHelpOpen)
-  const { compactKey, previewKey, detailKey, gitKey, focusKey, sendKey, choiceModifier } =
+  const { compactKey, previewKey, detailKey, gitKey, diffKey, focusKey, sendKey, choiceModifier } =
     useSettingsStore.getState()
 
   const close = (): void => {
@@ -43,6 +43,7 @@ export function HelpOverlay(): React.JSX.Element | null {
         [`Ctrl+${previewKey.toUpperCase()}`, 'Preview (press twice for live)'],
         [`Ctrl+${detailKey.toUpperCase()}`, 'Session detail'],
         [`Ctrl+${gitKey.toUpperCase()}`, 'Git operations'],
+        [`Ctrl+${diffKey.toUpperCase()}`, 'Git diff viewer'],
         ['Ctrl+N', 'New session'],
         ['Ctrl+,', 'This help']
       ]
@@ -59,6 +60,15 @@ export function HelpOverlay(): React.JSX.Element | null {
     {
       title: 'In Preview',
       shortcuts: [
+        ['j / k', 'Scroll line'],
+        ['d / u', 'Scroll half page'],
+        ['g / G', 'Top / bottom']
+      ]
+    },
+    {
+      title: 'In Diff',
+      shortcuts: [
+        ['s', 'Toggle staged/unstaged'],
         ['j / k', 'Scroll line'],
         ['d / u', 'Scroll half page'],
         ['g / G', 'Top / bottom']

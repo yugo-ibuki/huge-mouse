@@ -15,7 +15,8 @@ import {
   createSession,
   killPane,
   findShellPane,
-  ensureShellPane
+  ensureShellPane,
+  gitDiff
 } from './tmux'
 
 interface SkillEntry {
@@ -221,6 +222,7 @@ app.whenReady().then(() => {
   ipcMain.handle('git:add', async (_event, cwd: string) => gitAdd(cwd))
   ipcMain.handle('git:commit', async (_event, { cwd, message }) => gitCommit(cwd, message))
   ipcMain.handle('git:push', async (_event, cwd: string) => gitPush(cwd))
+  ipcMain.handle('git:diff', async (_event, { cwd, staged }) => gitDiff(cwd, staged))
 
   ipcMain.handle('window:set-always-on-top', (_event, value: boolean) => {
     const win = BrowserWindow.getFocusedWindow()

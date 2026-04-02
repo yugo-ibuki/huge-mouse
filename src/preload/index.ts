@@ -54,6 +54,8 @@ const api = {
   gitCommit: (cwd: string, message: string): Promise<SendResult> =>
     ipcRenderer.invoke('git:commit', { cwd, message }),
   gitPush: (cwd: string): Promise<SendResult> => ipcRenderer.invoke('git:push', cwd),
+  gitDiff: (cwd: string, staged = false): Promise<string> =>
+    ipcRenderer.invoke('git:diff', { cwd, staged }),
   setAlwaysOnTop: (value: boolean): Promise<boolean> =>
     ipcRenderer.invoke('window:set-always-on-top', value),
   getAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:get-always-on-top'),

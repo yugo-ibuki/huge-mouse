@@ -58,6 +58,7 @@ interface TmuxAPI {
   gitAdd: (cwd: string) => Promise<SendResult>
   gitCommit: (cwd: string, message: string) => Promise<SendResult>
   gitPush: (cwd: string) => Promise<SendResult>
+  gitDiff: (cwd: string, staged?: boolean) => Promise<string>
   setAlwaysOnTop: (value: boolean) => Promise<boolean>
   getAlwaysOnTop: () => Promise<boolean>
   setOpacity: (value: number) => Promise<number>

@@ -11,6 +11,7 @@ import { Sidebar } from './components/Sidebar'
 import { PreviewOverlay } from './components/PreviewOverlay'
 import { DetailOverlay } from './components/DetailOverlay'
 import { GitOverlay } from './components/GitOverlay'
+import { DiffOverlay } from './components/DiffOverlay'
 import { HelpOverlay } from './components/HelpOverlay'
 import { CreateDialog } from './components/CreateDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
@@ -30,6 +31,7 @@ function App(): React.JSX.Element {
   const paneContent = useUiStore((s) => s.paneContent)
   const paneDetail = useUiStore((s) => s.paneDetail)
   const gitPopup = useUiStore((s) => s.gitPopup)
+  const diffContent = useUiStore((s) => s.diffContent)
   const createDialog = useUiStore((s) => s.createDialog)
   const confirmKill = useUiStore((s) => s.confirmKill)
   const lastPrompts = usePaneStore((s) => s.lastPrompts)
@@ -128,6 +130,7 @@ function App(): React.JSX.Element {
       {paneContent !== null && <PreviewOverlay streamRefs={streamRefs} />}
       {paneDetail !== null && <DetailOverlay />}
       {gitPopup !== null && <GitOverlay />}
+      {diffContent !== null && <DiffOverlay />}
       {createDialog && <CreateDialog />}
       {confirmKill && paneDetail && <ConfirmDialog />}
       <HelpOverlay />

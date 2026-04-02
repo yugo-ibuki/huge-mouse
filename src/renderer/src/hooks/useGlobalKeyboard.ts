@@ -12,7 +12,7 @@ export function useGlobalKeyboard(
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
       const { panes, selected, setSelected } = usePaneStore.getState()
-      const { choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey } =
+      const { choiceModifier, vimMode, compactKey, previewKey, detailKey, gitKey, diffKey } =
         useSettingsStore.getState()
       const {
         paneContent,
@@ -181,6 +181,22 @@ export function useGlobalKeyboard(
         return
       }
 
+      // Ctrl+[diffKey] → show diff overlay
+      if (e.ctrlKey && e.key === diffKey && !e.metaKey) {
+        e.preventDefault()
+        if (selected) {
+          window.api.getPaneDetail(selected).then(async (detail) => {
+            if (!detail?.cwd) return
+            const diff = await window.api.gitDiff(detail.cwd, false)
+            const { setDiffContent, setDiffStaged, setDiffCwd } = useUiStore.getState()
+            setDiffCwd(detail.cwd)
+            setDiffStaged(false)
+            setDiffContent(diff || '(no changes)')
+          })
+        }
+        return
+      }
+
       // Git popup shortcuts: Ctrl+A (add), Ctrl+P (push)
       if (gitPopup && e.ctrlKey && !e.metaKey && (e.target as HTMLElement).tagName !== 'INPUT') {
         if (e.key === 'a') {
@@ -278,6 +294,12 @@ export function useGlobalKeyboard(
         if (paneDetail !== null) {
           e.preventDefault()
           setPaneDetail(null)
+          requestAnimationFrame(() => textareaRef.current?.focus())
+          return
+        }
+        if (useUiStore.getState().diffContent !== null) {
+          e.preventDefault()
+          useUiStore.getState().setDiffContent(null)
           requestAnimationFrame(() => textareaRef.current?.focus())
           return
         }

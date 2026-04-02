@@ -566,6 +566,16 @@ export async function gitPush(cwd: string): Promise<{ success: boolean; error?: 
   }
 }
 
+export async function gitDiff(cwd: string, staged: boolean): Promise<string> {
+  try {
+    const args = ['-C', cwd, 'diff']
+    if (staged) args.push('--staged')
+    return await runGit(args)
+  } catch {
+    return ''
+  }
+}
+
 export async function listTmuxSessions(): Promise<string[]> {
   try {
     const stdout = await run(['list-sessions', '-F', '#{session_name}'])

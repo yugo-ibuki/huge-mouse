@@ -12,6 +12,7 @@ interface SettingsState {
   previewKey: string
   detailKey: string
   gitKey: string
+  diffKey: string
   focusKey: string
   fontSize: number
   sendKey: SendKey
@@ -27,6 +28,7 @@ interface SettingsActions {
   setPreviewKey: (value: string) => void
   setDetailKey: (value: string) => void
   setGitKey: (value: string) => void
+  setDiffKey: (value: string) => void
   setFocusKey: (value: string) => void
   setFontSize: (value: number) => void
   setSendKey: (value: SendKey) => void
@@ -72,6 +74,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set) =>
   previewKey: loadSetting<string>('previewKey', 'p'),
   detailKey: loadSetting<string>('detailKey', 'd'),
   gitKey: loadSetting<string>('gitKey', 'g'),
+  diffKey: loadSetting<string>('diffKey', 'f'),
   focusKey: loadSetting<string>('focusKey', 'h'),
   fontSize: initialFontSize,
   sendKey: loadSetting<SendKey>('sendKey', 'cmd+enter'),
@@ -113,6 +116,11 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set) =>
   setGitKey: (value) => {
     saveSetting('gitKey', value)
     set({ gitKey: value })
+  },
+
+  setDiffKey: (value) => {
+    saveSetting('diffKey', value)
+    set({ diffKey: value })
   },
 
   setFocusKey: (value) => {

@@ -1504,3 +1504,43 @@
   color: var(--accent);
   font-weight: 600;
 }
+
+/* ── Diff ── */
+.diff-content {
+  white-space: pre;
+  word-break: normal;
+}
+
+.diff-header {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.diff-meta {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.diff-hunk {
+  color: var(--accent);
+}
+
+.diff-add {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.diff-del {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+[data-theme='light'] .diff-add {
+  color: #16a372;
+  background: rgba(22, 163, 114, 0.1);
+}
+
+[data-theme='light'] .diff-del {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
