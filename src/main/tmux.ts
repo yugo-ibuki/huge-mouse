@@ -69,6 +69,39 @@ function encodeCwd(cwd: string): string {
   return cwd.replace(/[/.]/g, '-')
 }
 
+// Walk the process tree from a given PID to find descendant PIDs (up to maxDepth).
+// Used to locate the claude process running inside a tmux pane, since pane_pid
+// is the initial shell (e.g. fish) and claude runs as a grandchild.
+async function findDescendantPids(pid: string, maxDepth = 3): Promise<string[]> {
+  const result: string[] = []
+  const queue: { pid: string; depth: number }[] = [{ pid, depth: 0 }]
+
+  while (queue.length > 0) {
+    const item = queue.shift()!
+    if (item.depth >= maxDepth) continue
+
+    try {
+      const output = await new Promise<string>((resolve, reject) => {
+        execFile('pgrep', ['-P', item.pid], (err, stdout) => {
+          if (err) reject(err)
+          else resolve(stdout)
+        })
+      })
+      for (const line of output.trim().split('\n')) {
+        const childPid = line.trim()
+        if (childPid) {
+          result.push(childPid)
+          queue.push({ pid: childPid, depth: item.depth + 1 })
+        }
+      }
+    } catch {
+      // pgrep returns exit code 1 when no children found
+    }
+  }
+
+  return result
+}
+
 async function findSessionJsonl(target: string): Promise<string | null> {
   try {
     const info = await run([
@@ -83,16 +116,34 @@ async function findSessionJsonl(target: string): Promise<string | null> {
     const claudeDir = join(homedir(), '.claude')
     const sessionsDir = join(claudeDir, 'sessions')
 
-    // Try direct PID match
-    try {
-      const data = JSON.parse(await readFile(join(sessionsDir, `${pid}.json`), 'utf-8'))
-      const jsonlPath = join(claudeDir, 'projects', encodeCwd(data.cwd), `${data.sessionId}.jsonl`)
-      if (existsSync(jsonlPath)) return jsonlPath
-    } catch {
-      // PID doesn't match directly
+    // Helper: resolve a session file by PID to its JSONL path
+    const resolveByPid = async (p: string): Promise<string | null> => {
+      try {
+        const data = JSON.parse(await readFile(join(sessionsDir, `${p}.json`), 'utf-8'))
+        const jsonlPath = join(claudeDir, 'projects', encodeCwd(data.cwd), `${data.sessionId}.jsonl`)
+        if (existsSync(jsonlPath)) return jsonlPath
+      } catch {
+        // no session file for this PID
+      }
+      return null
     }
 
-    // Scan session files for matching CWD, pick most recent
+    // 1. Try direct PID match (pane_pid itself)
+    const direct = await resolveByPid(pid)
+    if (direct) return direct
+
+    // 2. Walk descendant processes (shell → claude grandchild) and match
+    try {
+      const descendants = await findDescendantPids(pid)
+      for (const childPid of descendants) {
+        const match = await resolveByPid(childPid)
+        if (match) return match
+      }
+    } catch {
+      // process tree walk failed
+    }
+
+    // 3. Fallback: scan session files for matching CWD, pick most recent
     try {
       const files = await readdir(sessionsDir)
       let best: { path: string; startedAt: number } | null = null
