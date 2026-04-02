@@ -146,9 +146,7 @@ const SURVEY_LABEL_SET = new Set(['bad', 'fine', 'good', 'great', 'dismiss', 'sk
 
 // Check if choices are all feedback/rating labels (survey, not actionable)
 function isSurveyChoices(choices: TmuxChoice[]): boolean {
-  return (
-    choices.length > 0 && choices.every((c) => SURVEY_LABEL_SET.has(c.label.toLowerCase()))
-  )
+  return choices.length > 0 && choices.every((c) => SURVEY_LABEL_SET.has(c.label.toLowerCase()))
 }
 
 // Check if surrounding lines contain "(optional)" marker
@@ -426,13 +424,10 @@ export async function sendInput(
     // Detect if the pane is showing choices (waiting state).
     // When choices are visible and input is a single digit (1-9),
     // skip insert mode switch since choices work in normal mode.
-    const content = await capturePaneContent(target)
-    const titleAndCmd = await run([
-      'display-message',
-      '-t',
-      target,
-      '-p',
-      '#{pane_title}|#{pane_current_command}'
+    // Run both captures in parallel to reduce latency.
+    const [content, titleAndCmd] = await Promise.all([
+      capturePaneContent(target),
+      run(['display-message', '-t', target, '-p', '#{pane_title}|#{pane_current_command}'])
     ])
     const [title, command] = titleAndCmd.trim().split('|')
     const { status } = detectStatus(title, content, command)
@@ -461,8 +456,8 @@ export async function sendInput(
       await run(['send-keys', '-t', target, '\x1b[200~'])
       await run(['send-keys', '-t', target, '-l', trimmed])
       await run(['send-keys', '-t', target, '\x1b[201~'])
-      await new Promise((r) => setTimeout(r, 300))
-      await run(['send-keys', '-t', target, '', 'Enter'])
+      await new Promise((r) => setTimeout(r, 50))
+      await run(['send-keys', '-t', target, 'Enter'])
     } else {
       await run(['send-keys', '-t', target, '-l', text])
       await run(['send-keys', '-t', target, 'Enter'])
@@ -594,7 +589,6 @@ export async function createSession(
   }
 }
 
-
 export async function killPane(target: string): Promise<{ success: boolean; error?: string }> {
   if (!TARGET_PATTERN.test(target)) {
     return { success: false, error: 'Invalid target format' }
@@ -642,7 +636,11 @@ export async function ensureShellPane(
     if (existing) return { success: true, target: existing }
 
     const currentWindow = await run([
-      'display-message', '-t', session, '-p', '#{window_index}'
+      'display-message',
+      '-t',
+      session,
+      '-p',
+      '#{window_index}'
     ]).then((s) => s.trim())
 
     const args = ['new-window', '-t', session, '-n', 'unitmux-shell']

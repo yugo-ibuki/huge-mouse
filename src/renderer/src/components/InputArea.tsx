@@ -9,12 +9,13 @@ function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
   const status = useUiStore((s) => s.status)
   const hasText = useInputStore((s) => s.text.trim().length > 0)
   const hasSelected = usePaneStore((s) => s.selected !== '')
+  const sending = useInputStore((s) => s.sending)
 
   return (
     <div className="footer">
       {status && <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>}
-      <button className="send-btn" onClick={send} disabled={!hasSelected || !hasText}>
-        Send
+      <button className="send-btn" onClick={send} disabled={!hasSelected || !hasText || sending}>
+        {sending ? 'Sending...' : 'Send'}
       </button>
     </div>
   )
@@ -66,64 +67,67 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
     const { selected: currentSelected } = usePaneStore.getState()
     if (!currentSelected || !currentText.trim()) return
 
-    const { shellMode: isShell } = useUiStore.getState()
+    // Guard against double-sends
+    if (useInputStore.getState().sending) return
+    useInputStore.getState().setSending(true)
 
-    if (isShell) {
-      const session = currentSelected.split(':')[0]
-      const detail = await window.api.getPaneDetail(currentSelected)
-      const cwd = detail?.cwd ?? ''
-      const result = await window.api.ensureShellPane(session, cwd)
-      if (!result.success || !result.target) {
-        useUiStore.getState().flashStatus(result.error ?? 'Failed to create shell pane', false)
-        return
-      }
-      const sendResult = await window.api.sendInput(result.target, currentText)
-      if (sendResult.success) {
-        useInputStore.getState().pushHistory(currentText)
-        useUiStore.getState().pushShellHistory(currentText)
-        if (textareaRef.current) textareaRef.current.value = ''
-        useInputStore.getState().setText('')
-        useUiStore.getState().flashStatus('Sent to shell!', true)
+    try {
+      const { shellMode: isShell } = useUiStore.getState()
+
+      if (isShell) {
+        const session = currentSelected.split(':')[0]
+        const detail = await window.api.getPaneDetail(currentSelected)
+        const cwd = detail?.cwd ?? ''
+        const result = await window.api.ensureShellPane(session, cwd)
+        if (!result.success || !result.target) {
+          useUiStore.getState().flashStatus(result.error ?? 'Failed to create shell pane', false)
+          return
+        }
+        const sendResult = await window.api.sendInput(result.target, currentText)
+        if (sendResult.success) {
+          useInputStore.getState().pushHistory(currentText)
+          useUiStore.getState().pushShellHistory(currentText)
+          if (textareaRef.current) textareaRef.current.value = ''
+          useInputStore.getState().setText('')
+          useUiStore.getState().flashStatus('Sent to shell!', true)
+        } else {
+          useUiStore.getState().flashStatus(sendResult.error ?? 'Failed', false)
+        }
       } else {
-        useUiStore.getState().flashStatus(sendResult.error ?? 'Failed', false)
+        const currentVimMode = useSettingsStore.getState().vimMode
+        const result = await window.api.sendInput(currentSelected, currentText, currentVimMode)
+        if (result.success) {
+          useInputStore.getState().pushHistory(currentText)
+          if (textareaRef.current) textareaRef.current.value = ''
+          useInputStore.getState().setText('')
+          const firstLine = currentText.split('\n')[0].slice(0, 60)
+          usePaneStore.getState().updateLastPrompt(currentSelected, firstLine)
+          useUiStore.getState().flashStatus('Sent!', true)
+        } else {
+          useUiStore.getState().flashStatus(result.error ?? 'Failed', false)
+        }
       }
-    } else {
-      const currentVimMode = useSettingsStore.getState().vimMode
-      const result = await window.api.sendInput(currentSelected, currentText, currentVimMode)
-      if (result.success) {
-        useInputStore.getState().pushHistory(currentText)
-        if (textareaRef.current) textareaRef.current.value = ''
-        useInputStore.getState().setText('')
-        const firstLine = currentText.split('\n')[0].slice(0, 60)
-        usePaneStore.getState().updateLastPrompt(currentSelected, firstLine)
-        useUiStore.getState().flashStatus('Sent!', true)
-      } else {
-        useUiStore.getState().flashStatus(result.error ?? 'Failed', false)
-      }
+    } finally {
+      useInputStore.getState().setSending(false)
     }
   }, [textareaRef])
 
-  const handleTextChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const val = e.target.value
-      const store = useInputStore.getState()
-      store.setText(val)
-      const cmds = [
-        ...store.slashCommands,
-        ...store.skillCommands.filter(
-          (sk) => !store.slashCommands.some((uc) => uc.name === sk.name)
-        )
-      ]
-      const match = val.match(/^\/(\S*)$/)
-      if (match && cmds.length > 0) {
-        store.setSlashFilter(match[1])
-        store.setSlashIndex(0)
-      } else {
-        store.setSlashFilter(null)
-      }
-    },
-    []
-  )
+  const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    const store = useInputStore.getState()
+    store.setText(val)
+    const cmds = [
+      ...store.slashCommands,
+      ...store.skillCommands.filter((sk) => !store.slashCommands.some((uc) => uc.name === sk.name))
+    ]
+    const match = val.match(/^\/(\S*)$/)
+    if (match && cmds.length > 0) {
+      store.setSlashFilter(match[1])
+      store.setSlashIndex(0)
+    } else {
+      store.setSlashFilter(null)
+    }
+  }, [])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

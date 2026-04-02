@@ -3,6 +3,7 @@ import type { SlashCommand, SkillCommand } from '../types'
 
 interface InputState {
   text: string
+  sending: boolean
   slashFilter: string | null
   slashIndex: number
   history: string[]
@@ -14,6 +15,7 @@ interface InputState {
 
 interface InputActions {
   setText: (text: string) => void
+  setSending: (sending: boolean) => void
   setSlashFilter: (filter: string | null) => void
   setSlashIndex: (indexOrUpdater: number | ((prev: number) => number)) => void
   pushHistory: (text: string) => void
@@ -36,6 +38,7 @@ function loadSlashCommands(): SlashCommand[] {
 
 export const useInputStore = create<InputState & InputActions>((set, get) => ({
   text: '',
+  sending: false,
   slashFilter: null,
   slashIndex: 0,
   history: [],
@@ -45,6 +48,7 @@ export const useInputStore = create<InputState & InputActions>((set, get) => ({
   skillCommands: [],
 
   setText: (text) => set({ text }),
+  setSending: (sending) => set({ sending }),
 
   setSlashFilter: (slashFilter) => set({ slashFilter }),
 
