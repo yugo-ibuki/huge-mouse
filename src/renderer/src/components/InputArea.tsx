@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import type { SlashCommand, SkillCommand } from '../types'
 import { useInputStore } from '../stores/inputStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -32,6 +32,11 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
   const skillCommands = useInputStore((s) => s.skillCommands)
   const sendKey = useSettingsStore((s) => s.sendKey)
   const shellMode = useUiStore((s) => s.shellMode)
+
+  // Track IME composition to avoid sending on the Enter that confirms composition.
+  // Chromium fires compositionend BEFORE the keydown(Enter), so isComposing is
+  // already false by the time handleKeyDown sees it. We use a ref + timeout instead.
+  const composingRef = useRef(false)
 
   const allCommands = useMemo(
     () => [
@@ -129,9 +134,22 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
     }
   }, [])
 
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true
+  }, [])
+
+  const handleCompositionEnd = useCallback(() => {
+    // Delay clearing so the keydown(Enter) that confirms composition is still blocked
+    setTimeout(() => {
+      composingRef.current = false
+    }, 50)
+  }, [])
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.nativeEvent.isComposing) return
+      // Block during IME composition. Also check composingRef for the Enter
+      // that confirms composition (Chromium sets isComposing=false too early).
+      if (e.nativeEvent.isComposing || composingRef.current) return
 
       const store = useInputStore.getState()
       const currentSlashFilter = store.slashFilter
@@ -240,6 +258,8 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
           }
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
         />
         {slashFilter !== null && filteredSlash.length > 0 && (
           <div className="slash-menu">
