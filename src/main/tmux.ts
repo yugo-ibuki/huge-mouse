@@ -66,7 +66,7 @@ const TOOL_ICONS: Record<string, string> = {
 }
 
 function encodeCwd(cwd: string): string {
-  return cwd.replace(/\//g, '-')
+  return cwd.replace(/[/.]/g, '-')
 }
 
 async function findSessionJsonl(target: string): Promise<string | null> {
