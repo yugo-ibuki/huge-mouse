@@ -108,8 +108,11 @@ export function PreviewOverlay({
                 )
               })
             }
-            const lastIdx = paneContent.lastIndexOf('\n⏺')
-            if (lastIdx === -1) return paneContent
+            // Find last response marker: ⏺ at start of a line.
+            // In FLICK (alternate screen) mode, the marker may be preceded by spaces.
+            const markerMatch = paneContent.match(/\n\s*⏺[^]*$/)
+            if (!markerMatch || markerMatch.index === undefined) return paneContent
+            const lastIdx = markerMatch.index
             const before = paneContent.slice(0, lastIdx + 1)
             const after = paneContent.slice(lastIdx + 1)
             return (

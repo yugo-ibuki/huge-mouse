@@ -18,6 +18,31 @@ export interface TmuxPane {
   prompt: string
 }
 
+// Strip ANSI escape sequences from captured pane content.
+// capture-pane -p normally strips them, but FLICK (alternate screen) mode
+// can leave CSI / OSC remnants in certain tmux versions.
+const ESC = String.fromCharCode(0x1b)
+const BEL = String.fromCharCode(0x07)
+const RE_CSI = new RegExp(ESC + '\\[[0-9;]*[A-Za-z]', 'g')
+const RE_OSC = new RegExp(ESC + '\\][^' + BEL + ESC + ']*(?:' + BEL + '|' + ESC + '\\\\)', 'g')
+const RE_CHARSET = new RegExp(ESC + '[()][AB012]', 'g')
+const RE_MODE = new RegExp(ESC + '[>=]', 'g')
+
+function stripAnsi(text: string): string {
+  return text.replace(RE_CSI, '').replace(RE_OSC, '').replace(RE_CHARSET, '').replace(RE_MODE, '')
+}
+
+// Detect if a pane is currently showing the alternate screen buffer
+// (i.e. Claude Code is running in FLICK / NO_FLICKER mode).
+async function isAlternateScreen(target: string): Promise<boolean> {
+  try {
+    const result = await run(['display-message', '-t', target, '-p', '#{alternate_on}'])
+    return result.trim() === '1'
+  } catch {
+    return false
+  }
+}
+
 const TMUX_PATHS = ['/opt/homebrew/bin/tmux', '/usr/local/bin/tmux', '/usr/bin/tmux']
 const GIT_PATHS = ['/opt/homebrew/bin/git', '/usr/local/bin/git', '/usr/bin/git']
 
@@ -121,7 +146,8 @@ const WAITING_PATTERNS = [
 
 async function capturePaneContent(target: string): Promise<string> {
   try {
-    return await run(['capture-pane', '-t', target, '-p'])
+    const output = await run(['capture-pane', '-t', target, '-p'])
+    return stripAnsi(output)
   } catch {
     return ''
   }
@@ -608,14 +634,53 @@ export async function killPane(target: string): Promise<{ success: boolean; erro
 }
 
 function trimCliFooter(output: string): string {
-  return output
+  const lines = output.split('\n')
+
+  // Strip trailing empty lines
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+    lines.pop()
+  }
+
+  // Strip CLI footer lines from the bottom: separator, session/model info,
+  // prompt cursor, mode indicator, token/cost counters (FLICK mode).
+  while (lines.length > 0) {
+    const last = lines[lines.length - 1]
+    if (
+      /─{5,}/.test(last) ||
+      /^\s*(Session|Model)\b/.test(last) ||
+      /^\s*❯\s*$/.test(last) ||
+      /\b(plan|compact) mode\b/.test(last) ||
+      // FLICK mode renders token/cost counters and message counts in the footer
+      /\d+\s*tokens?\b/i.test(last) ||
+      /\$[\d.]+\s*(cost|spent)/i.test(last) ||
+      // Keybinding hints that appear at the bottom of FLICK TUI
+      /^\s*(Ctrl|Esc|Enter)\b.*\b(send|cancel|submit|menu)\b/i.test(last) ||
+      // Empty input area indicator
+      /^\s*>\s*$/.test(last)
+    ) {
+      lines.pop()
+      while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+        lines.pop()
+      }
+    } else {
+      break
+    }
+  }
+
+  return lines.join('\n')
 }
 
 export async function capturePane(target: string): Promise<string> {
   if (!TARGET_PATTERN.test(target)) return ''
   try {
-    const output = await run(['capture-pane', '-t', target, '-p', '-S', '-500'])
-    return trimCliFooter(output)
+    const altScreen = await isAlternateScreen(target)
+    // Alternate screen (FLICK / NO_FLICKER mode) has no scrollback history,
+    // so -S -500 is useless. Just capture the current visible screen.
+    const args = altScreen
+      ? ['capture-pane', '-t', target, '-p']
+      : ['capture-pane', '-t', target, '-p', '-S', '-500']
+    const output = await run(args)
+    return trimCliFooter(stripAnsi(output))
   } catch {
     return ''
   }
@@ -663,5 +728,6 @@ export async function ensureShellPane(
 export const _testInternals = {
   parseChoices,
   detectStatusClaude,
-  trimCliFooter
+  trimCliFooter,
+  stripAnsi
 }
