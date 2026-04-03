@@ -207,8 +207,15 @@ export async function getConversationLog(target: string): Promise<ChatMessage[]>
         const record = JSON.parse(line)
 
         if (record.type === 'user' && record.message?.role === 'user') {
-          const text =
-            typeof record.message.content === 'string' ? record.message.content.trim() : ''
+          let text = ''
+          if (typeof record.message.content === 'string') {
+            text = record.message.content.trim()
+          } else if (Array.isArray(record.message.content)) {
+            text = record.message.content
+              .filter((b: { type: string; text?: string }) => b.type === 'text' && b.text?.trim())
+              .map((b: { text: string }) => b.text.trim())
+              .join('\n')
+          }
           if (text) {
             messages.push({ role: 'user', text, timestamp: record.timestamp ?? '' })
           }
