@@ -58,6 +58,7 @@ export function PreviewOverlay({
   const chatMessages = useUiStore((s) => s.chatMessages)
   const setChatMessages = useUiStore((s) => s.setChatMessages)
   const selected = usePaneStore((s) => s.selected)
+  const currentPane = usePaneStore((s) => s.panes.find((p) => p.target === s.selected))
   const previewKey = useSettingsStore((s) => s.previewKey)
 
   const { streamActiveRef, paneViewerRef } = streamRefs
@@ -143,6 +144,21 @@ export function PreviewOverlay({
             {chatMessages.map((msg, i) => (
               <ChatBubble key={i} msg={msg} index={i} />
             ))}
+            {currentPane?.status === 'waiting' && currentPane.prompt && (
+              <div className="chat-current-prompt">
+                <div className="chat-current-prompt-label">Waiting for response</div>
+                <pre className="chat-current-prompt-text">{currentPane.prompt}</pre>
+                {currentPane.choices.length > 0 && (
+                  <div className="chat-current-prompt-choices">
+                    {currentPane.choices.map((c) => (
+                      <span key={c.number} className="chat-current-prompt-choice">
+                        {c.number}. {c.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <pre

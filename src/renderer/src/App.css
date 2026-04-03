@@ -904,6 +904,52 @@
   margin-top: 2px;
 }
 
+/* ── Current prompt in chat preview ── */
+.chat-current-prompt {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px dashed rgba(251, 191, 36, 0.4);
+  border-left: 3px solid rgba(251, 191, 36, 0.7);
+}
+
+.chat-current-prompt-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(251, 191, 36, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.chat-current-prompt-text {
+  font-size: var(--font-size, 12px);
+  font-family: var(--font-mono);
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.chat-current-prompt-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.chat-current-prompt-choice {
+  font-size: calc(var(--font-size, 12px) - 1px);
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
 @keyframes overlay-in {
   from {
     opacity: 0;
