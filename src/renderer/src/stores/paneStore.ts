@@ -34,7 +34,8 @@ function panesChanged(prev: TmuxPane[], next: TmuxPane[]): boolean {
       p.target !== n.target ||
       p.status !== n.status ||
       p.prompt !== n.prompt ||
-      p.choices.length !== n.choices.length
+      p.choices.length !== n.choices.length ||
+      p.activityLine !== n.activityLine
     ) {
       return true
     }

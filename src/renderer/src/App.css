@@ -904,6 +904,33 @@
   margin-top: 2px;
 }
 
+/* ── Activity indicator in chat preview (shown when Claude is busy) ── */
+.chat-activity-indicator {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px dashed rgba(139, 92, 246, 0.3);
+  border-left: 3px solid rgba(139, 92, 246, 0.6);
+  animation: pulse-activity 2s ease-in-out infinite;
+}
+
+.chat-activity-text {
+  font-size: var(--font-size, 12px);
+  font-family: var(--font-mono);
+  color: rgba(139, 92, 246, 0.9);
+}
+
+@keyframes pulse-activity {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
 /* ── Current prompt in chat preview ── */
 .chat-current-prompt {
   margin-top: 8px;

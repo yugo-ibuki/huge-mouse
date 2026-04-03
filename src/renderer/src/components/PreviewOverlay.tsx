@@ -144,6 +144,11 @@ export function PreviewOverlay({
             {chatMessages.map((msg, i) => (
               <ChatBubble key={i} msg={msg} index={i} />
             ))}
+            {currentPane?.status === 'busy' && currentPane.activityLine && (
+              <div className="chat-activity-indicator">
+                <span className="chat-activity-text">{currentPane.activityLine}</span>
+              </div>
+            )}
             {currentPane?.status === 'waiting' && currentPane.prompt && (
               <div className="chat-current-prompt">
                 <div className="chat-current-prompt-label">Waiting for response</div>
