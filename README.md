@@ -71,6 +71,7 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Ctrl+D`                    | Open session detail popup (key configurable)                            |
 | `Ctrl+C`                    | Close session with confirmation (when detail panel is open)             |
 | `Ctrl+G`                    | Open git operations popup (key configurable)                            |
+| `Ctrl+F`                    | Open git diff viewer (key configurable)                                 |
 | `Ctrl+S`                    | Stop the running session — sends Escape to interrupt (key configurable) |
 | `Ctrl+W`                    | Toggle compact mode — shrinks window to tab bar only (key configurable) |
 | `Ctrl+N`                    | Create a new session (select target tmux session and command)           |
@@ -116,6 +117,7 @@ Click the gear icon to access settings:
 - **Preview Key** — change the key for pane content preview (`Ctrl+<key>`)
 - **Detail Key** — change the key for session detail popup (`Ctrl+<key>`)
 - **Git Key** — change the key for git operations popup (`Ctrl+<key>`)
+- **Diff Key** — change the key for git diff viewer (`Ctrl+<key>`)
 - **Focus Key** — change the global shortcut to focus unitmux (`Cmd+Shift+<key>`)
 - **Slash Commands** — add, edit, and delete reusable slash commands
 
