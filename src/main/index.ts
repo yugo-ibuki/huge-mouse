@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, protocol } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
 import { readdir, readFile } from 'fs/promises'
@@ -136,6 +136,11 @@ function createWindow(): void {
     mainWindow!.show()
   })
 
+  // Relay image drops from preload to renderer
+  ipcMain.on('image-dropped-from-renderer', (_event, paths: string[]) => {
+    mainWindow?.webContents.send('image-dropped', paths)
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -143,8 +148,32 @@ function createWindow(): void {
   }
 }
 
+// Register custom protocol to serve local files for image thumbnails
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'local-image', privileges: { bypassCSP: true, supportFetchAPI: true } }
+])
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.unitmux')
+
+  // Handle local-image:// requests by serving files from disk
+  protocol.handle('local-image', async (request) => {
+    const filePath = decodeURIComponent(new URL(request.url).pathname)
+    const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+    const mimeMap: Record<string, string> = {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      svg: 'image/svg+xml',
+      bmp: 'image/bmp'
+    }
+    const data = await readFile(filePath)
+    return new Response(data, {
+      headers: { 'Content-Type': mimeMap[ext] ?? 'application/octet-stream' }
+    })
+  })
 
   // Custom menu: remove Cmd+H (Hide) accelerator to prevent conflict with Ctrl+Cmd+H
   const menu = Menu.buildFromTemplate([
@@ -187,8 +216,25 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle('tmux:send-input', async (_event, { target, text, vimMode }) => {
-    return sendInput(target, text, vimMode)
+  ipcMain.handle('tmux:send-input', async (_event, { target, text, vimMode, images }) => {
+    return sendInput(target, text, vimMode, images)
+  })
+
+  ipcMain.handle('dialog:open-image', async () => {
+    const win = mainWindow
+    if (!win) return []
+    // Temporarily disable alwaysOnTop so the native dialog is visible on macOS
+    const wasOnTop = win.isAlwaysOnTop()
+    if (wasOnTop) win.setAlwaysOnTop(false)
+    try {
+      const result = await dialog.showOpenDialog(win, {
+        properties: ['openFile', 'multiSelections'],
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'] }]
+      })
+      return result.canceled ? [] : result.filePaths
+    } finally {
+      if (wasOnTop) win.setAlwaysOnTop(true)
+    }
   })
 
   ipcMain.handle('tmux:capture-pane', async (_event, target: string) => {
