@@ -3,46 +3,6 @@ import { useUiStore } from '../stores/uiStore'
 import { usePaneStore } from '../stores/paneStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { StreamRefs } from '../hooks/useStreaming'
-import type { ChatMessage } from '../types'
-
-function ChatBubble({ msg, index }: { msg: ChatMessage; index: number }): React.JSX.Element {
-  const isUser = msg.role === 'user'
-  const ts = msg.timestamp
-    ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : ''
-
-  // Split text into text lines and tool lines for assistant messages
-  const lines = msg.text.split('\n')
-
-  return (
-    <div key={index} className={`chat-row ${isUser ? 'chat-row-right' : 'chat-row-left'}`}>
-      <div className={`chat-bubble ${isUser ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
-        {lines.map((line, i) => {
-          // Detect tool indicator lines (emoji + tool name pattern)
-          const isTool =
-            !isUser &&
-            /^[\u{1F4C4}\u{270F}\u{1F4DD}\u{1F4BB}\u{1F50D}\u{1F4C2}\u{1F916}\u{1F310}\u{1F50E}\u{1F4CB}\u{1F527}]/u.test(
-              line
-            )
-          if (isTool) {
-            return (
-              <div key={i} className="chat-tool-line">
-                {line}
-              </div>
-            )
-          }
-          return (
-            <span key={i}>
-              {line}
-              {i < lines.length - 1 ? '\n' : ''}
-            </span>
-          )
-        })}
-        {ts && <span className="chat-timestamp">{ts}</span>}
-      </div>
-    </div>
-  )
-}
 
 export function PreviewOverlay({
   streamRefs
@@ -55,9 +15,6 @@ export function PreviewOverlay({
   const setStreaming = useUiStore((s) => s.setStreaming)
   const shellMode = useUiStore((s) => s.shellMode)
   const shellHistory = useUiStore((s) => s.shellHistory)
-  const chatMessages = useUiStore((s) => s.chatMessages)
-  const setChatMessages = useUiStore((s) => s.setChatMessages)
-  const pendingUserMessage = useUiStore((s) => s.pendingUserMessage)
   const selected = usePaneStore((s) => s.selected)
   const currentPane = usePaneStore((s) => s.panes.find((p) => p.target === s.selected))
   const previewKey = useSettingsStore((s) => s.previewKey)
@@ -67,7 +24,6 @@ export function PreviewOverlay({
   const closePreview = (): void => {
     streamActiveRef.current = false
     setPaneContent(null)
-    setChatMessages(null)
     setStreaming(false)
     window.api.stopStream()
     requestAnimationFrame(() => {
@@ -76,8 +32,6 @@ export function PreviewOverlay({
   }
 
   if (paneContent === null) return null
-
-  const isChatMode = chatMessages !== null && chatMessages.length > 0
 
   return (
     <div
@@ -132,65 +86,7 @@ export function PreviewOverlay({
             Esc
           </button>
         </div>
-        {isChatMode ? (
-          <div
-            ref={paneViewerRef as unknown as React.RefObject<HTMLDivElement>}
-            className="pane-popup-content chat-container"
-            onCopy={(e) => {
-              const selectedText = window.getSelection()?.toString() ?? ''
-              e.clipboardData.setData('text/plain', selectedText)
-              e.preventDefault()
-            }}
-          >
-            {chatMessages.map((msg, i) => (
-              <ChatBubble key={i} msg={msg} index={i} />
-            ))}
-            {pendingUserMessage &&
-              !chatMessages.some(
-                (m) => m.role === 'user' && m.text === pendingUserMessage.text
-              ) && (
-                <ChatBubble
-                  msg={pendingUserMessage}
-                  index={chatMessages.length}
-                />
-              )}
-            {currentPane?.status === 'busy' && (
-              <div className="chat-activity-indicator">
-                <span className="busy-spinner" />
-                <span className="chat-activity-text">
-                  {currentPane.activityLine || 'Working...'}
-                </span>
-              </div>
-            )}
-            {streaming && paneContent && paneContent !== '__chat__' && (
-              <pre className="chat-raw-preview">{paneContent}</pre>
-            )}
-            {currentPane?.status === 'waiting' && currentPane.prompt && (
-              <div className="chat-current-prompt">
-                <div className="chat-current-prompt-label">Waiting for response</div>
-                <pre className="chat-current-prompt-text">{currentPane.prompt}</pre>
-                {currentPane.choices.length > 0 && (
-                  <div className="chat-current-prompt-choices">
-                    {currentPane.choices.map((c) => (
-                      <span key={c.number} className="chat-current-prompt-choice">
-                        {c.number}. {c.label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="pane-popup-content-wrapper">
-            {currentPane?.status === 'busy' && (
-              <div className="raw-activity-indicator">
-                <span className="busy-spinner" />
-                <span className="busy-text">
-                  {currentPane.activityLine || 'Working...'}
-                </span>
-              </div>
-            )}
+        <div className="pane-popup-content-wrapper">
           <pre
             ref={paneViewerRef}
             className="pane-popup-content"
@@ -215,7 +111,6 @@ export function PreviewOverlay({
                 })
               }
               // Find last response marker: ⏺ at start of a line.
-              // In FLICK (alternate screen) mode, the marker may be preceded by spaces.
               const markerMatch = paneContent.match(/\n\s*⏺[^]*$/)
               if (!markerMatch || markerMatch.index === undefined) return paneContent
               const lastIdx = markerMatch.index
@@ -229,8 +124,15 @@ export function PreviewOverlay({
               )
             })()}
           </pre>
-          </div>
-        )}
+          {currentPane?.status === 'busy' && (
+            <div className="raw-activity-indicator">
+              <span className="busy-spinner" />
+              <span className="busy-text">
+                {currentPane.activityLine || 'Working...'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

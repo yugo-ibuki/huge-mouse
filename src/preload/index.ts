@@ -5,12 +5,6 @@ export interface SkillEntry {
   description: string
 }
 
-export interface ChatMessage {
-  role: 'user' | 'assistant'
-  text: string
-  timestamp: string
-}
-
 export interface TmuxPane {
   target: string
   pid: string
@@ -81,20 +75,13 @@ const api = {
     ipcRenderer.on('focus-textarea', handler)
     return () => ipcRenderer.removeListener('focus-textarea', handler)
   },
-  getConversationLog: (target: string): Promise<ChatMessage[]> =>
-    ipcRenderer.invoke('tmux:conversation-log', target),
-  startStream: (target: string, mode?: 'raw' | 'chat'): Promise<boolean> =>
-    ipcRenderer.invoke('tmux:start-stream', mode ? { target, mode } : target),
+  startStream: (target: string): Promise<boolean> =>
+    ipcRenderer.invoke('tmux:start-stream', target),
   stopStream: (): Promise<boolean> => ipcRenderer.invoke('tmux:stop-stream'),
   onStreamData: (callback: (content: string) => void): (() => void) => {
     const handler = (_event: unknown, content: string): void => callback(content)
     ipcRenderer.on('tmux:stream-data', handler)
     return () => ipcRenderer.removeListener('tmux:stream-data', handler)
-  },
-  onChatData: (callback: (messages: ChatMessage[]) => void): (() => void) => {
-    const handler = (_event: unknown, messages: ChatMessage[]): void => callback(messages)
-    ipcRenderer.on('tmux:chat-data', handler)
-    return () => ipcRenderer.removeListener('tmux:chat-data', handler)
   }
 }
 

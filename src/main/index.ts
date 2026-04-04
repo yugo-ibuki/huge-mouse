@@ -17,7 +17,6 @@ import {
   findShellPane,
   ensureShellPane,
   gitDiff,
-  getConversationLog
 } from './tmux'
 
 interface SkillEntry {
@@ -60,43 +59,23 @@ async function listSkillsFromDir(baseDir: string): Promise<SkillEntry[]> {
   }
 }
 
-// Streaming state: polls capture-pane or JSONL and pushes content to renderer
+// Streaming state: polls capture-pane and pushes content to renderer
 let streamTarget: string | null = null
 let streamTimer: ReturnType<typeof setInterval> | null = null
-let streamMode: 'raw' | 'chat' = 'raw'
 let lastStreamContent = ''
-let lastChatJson = ''
 
-function startStream(win: BrowserWindow, target: string, mode: 'raw' | 'chat'): void {
+function startStream(win: BrowserWindow, target: string): void {
   stopStream()
   streamTarget = target
-  streamMode = mode
   lastStreamContent = ''
-  lastChatJson = ''
 
   const tick = async (): Promise<void> => {
     if (!streamTarget) return
     try {
-      if (streamMode === 'chat') {
-        const [messages, content] = await Promise.all([
-          getConversationLog(streamTarget),
-          capturePane(streamTarget)
-        ])
-        const json = JSON.stringify(messages)
-        if (json !== lastChatJson) {
-          lastChatJson = json
-          win.webContents.send('tmux:chat-data', messages)
-        }
-        if (content !== lastStreamContent) {
-          lastStreamContent = content
-          win.webContents.send('tmux:stream-data', content)
-        }
-      } else {
-        const content = await capturePane(streamTarget)
-        if (content !== lastStreamContent) {
-          lastStreamContent = content
-          win.webContents.send('tmux:stream-data', content)
-        }
+      const content = await capturePane(streamTarget)
+      if (content !== lastStreamContent) {
+        lastStreamContent = content
+        win.webContents.send('tmux:stream-data', content)
       }
     } catch {
       // pane may have closed
@@ -113,9 +92,7 @@ function stopStream(): void {
     streamTimer = null
   }
   streamTarget = null
-  streamMode = 'raw'
   lastStreamContent = ''
-  lastChatJson = ''
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -195,23 +172,12 @@ app.whenReady().then(() => {
     return capturePane(target)
   })
 
-  ipcMain.handle('tmux:conversation-log', async (_event, target: string) => {
-    return getConversationLog(target)
+  ipcMain.handle('tmux:start-stream', async (_event, arg: string) => {
+    const win = mainWindow
+    if (!win) return true
+    startStream(win, arg)
+    return true
   })
-
-  ipcMain.handle(
-    'tmux:start-stream',
-    async (_event, arg: string | { target: string; mode: string }) => {
-      const win = mainWindow
-      if (!win) return true
-      if (typeof arg === 'string') {
-        startStream(win, arg, 'raw')
-      } else {
-        startStream(win, arg.target, (arg.mode as 'raw' | 'chat') ?? 'raw')
-      }
-      return true
-    }
-  )
 
   ipcMain.handle('tmux:stop-stream', async () => {
     stopStream()

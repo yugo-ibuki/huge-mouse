@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { PaneDetail, ChatMessage } from '../types'
+import type { PaneDetail } from '../types'
 
 interface StatusMessage {
   message: string
@@ -31,8 +31,6 @@ interface UiState {
   diffContent: string | null
   diffStaged: boolean
   diffCwd: string
-  chatMessages: ChatMessage[] | null
-  pendingUserMessage: ChatMessage | null
 }
 
 interface UiActions {
@@ -54,8 +52,6 @@ interface UiActions {
   toggleShellMode: () => void
   pushShellHistory: (cmd: string) => void
   clearShellHistory: () => void
-  setChatMessages: (value: ChatMessage[] | null) => void
-  appendUserMessage: (text: string) => void
   flashStatus: (message: string, ok: boolean) => void
   setDiffContent: (value: string | null) => void
   setDiffStaged: (value: boolean) => void
@@ -82,8 +78,6 @@ export const useUiStore = create<UiState & UiActions>((set) => ({
   diffContent: null,
   diffStaged: false,
   diffCwd: '',
-  chatMessages: null,
-  pendingUserMessage: null,
 
   setSidebarOpen: (value) => set({ sidebarOpen: value }),
   setCompact: (value) => set({ compact: value }),
@@ -103,23 +97,6 @@ export const useUiStore = create<UiState & UiActions>((set) => ({
   toggleShellMode: () => set((s) => ({ shellMode: !s.shellMode })),
   pushShellHistory: (cmd) => set((s) => ({ shellHistory: [...s.shellHistory, cmd] })),
   clearShellHistory: () => set({ shellHistory: [] }),
-  setChatMessages: (value) =>
-    set((s) => {
-      if (!value) return { chatMessages: null, pendingUserMessage: null }
-      // Clear pending if stream now includes a newer user message
-      const pending = s.pendingUserMessage
-      if (pending && value.some((m) => m.role === 'user' && m.text === pending.text)) {
-        return { chatMessages: value, pendingUserMessage: null }
-      }
-      return { chatMessages: value }
-    }),
-  appendUserMessage: (text) =>
-    set((s) => {
-      const msg: ChatMessage = { role: 'user', text, timestamp: new Date().toISOString() }
-      if (!s.chatMessages) return { pendingUserMessage: msg }
-      return { chatMessages: [...s.chatMessages, msg], pendingUserMessage: msg }
-    }),
-
   setDiffContent: (value) => set({ diffContent: value }),
   setDiffStaged: (value) => set({ diffStaged: value }),
   setDiffCwd: (value) => set({ diffCwd: value }),

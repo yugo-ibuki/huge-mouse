@@ -31,7 +31,7 @@ export function useGlobalKeyboard(
         setGitResult
       } = useUiStore.getState()
 
-      const { streamActiveRef, paneViewerRef } = streamRefs
+      const { streamActiveRef, paneViewerRef, isAtBottomRef } = streamRefs
 
       // Pane navigation: Ctrl+Cmd+H/L → jump across session boundaries
       const isPrevSession = e.ctrlKey && e.metaKey && e.key === 'h'
@@ -118,7 +118,7 @@ export function useGlobalKeyboard(
       }
 
 
-      // Ctrl+[previewKey] → 1st press: static capture (chat or raw), 2nd press: start streaming
+      // Ctrl+[previewKey] → 1st press: static capture, 2nd press: start streaming
       if (e.ctrlKey && e.key === previewKey && !e.metaKey) {
         e.preventDefault()
         if (selected) {
@@ -133,26 +133,9 @@ export function useGlobalKeyboard(
             return result.success && result.target ? result.target : null
           }
 
-          if (paneContent === null && useUiStore.getState().chatMessages === null) {
+          if (paneContent === null) {
             getTarget().then(async (target) => {
               if (!target) return
-              // Try conversation log first (works for both normal and FLICK mode)
-              if (!shellMode) {
-                const msgs = await window.api.getConversationLog(target)
-                if (msgs.length > 0) {
-                  useUiStore.getState().setChatMessages(msgs)
-                  // Set raw capture as paneContent (used for LIVE raw fallback)
-                  const rawContent = await window.api.capturePane(target)
-                  useUiStore.getState().setPaneContent(rawContent || '__chat__')
-                  requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                      paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
-                    })
-                  })
-                  return
-                }
-              }
-              // Fallback to raw capture
               const content = await window.api.capturePane(target)
               useUiStore.getState().setPaneContent(content)
               requestAnimationFrame(() => {
@@ -164,10 +147,13 @@ export function useGlobalKeyboard(
           } else if (!streaming) {
             getTarget().then((target) => {
               if (!target) return
-              const isChatMode = useUiStore.getState().chatMessages !== null
               setStreaming(true)
               streamActiveRef.current = true
-              window.api.startStream(target, isChatMode ? 'chat' : 'raw')
+              isAtBottomRef.current = true
+              window.api.startStream(target)
+              requestAnimationFrame(() => {
+                paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
+              })
             })
           }
         }
@@ -318,7 +304,6 @@ export function useGlobalKeyboard(
           // Close preview: stop streaming and clear content
           streamActiveRef.current = false
           setPaneContent(null)
-          useUiStore.getState().setChatMessages(null)
           setStreaming(false)
           window.api.stopStream()
           requestAnimationFrame(() => textareaRef.current?.focus())

@@ -13,7 +13,7 @@ export function useStreaming(): StreamRefs {
   const isAtBottomRef = useRef(true)
 
   useEffect(() => {
-    const unsubRaw = window.api.onStreamData((content) => {
+    const unsub = window.api.onStreamData((content) => {
       if (!streamActiveRef.current) return
       const el = paneViewerRef.current
       if (el) {
@@ -26,22 +26,8 @@ export function useStreaming(): StreamRefs {
         })
       }
     })
-    const unsubChat = window.api.onChatData((messages) => {
-      if (!streamActiveRef.current) return
-      const el = paneViewerRef.current
-      if (el) {
-        isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 30
-      }
-      useUiStore.getState().setChatMessages(messages)
-      if (isAtBottomRef.current) {
-        requestAnimationFrame(() => {
-          paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
-        })
-      }
-    })
     return () => {
-      unsubRaw()
-      unsubChat()
+      unsub()
     }
   }, [])
 

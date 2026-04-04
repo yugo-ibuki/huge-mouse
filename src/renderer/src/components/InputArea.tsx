@@ -103,7 +103,6 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
       const result = await window.api.sendInput(currentSelected, currentText, currentVimMode)
       if (result.success) {
         useInputStore.getState().pushHistory(currentText)
-        useUiStore.getState().appendUserMessage(currentText)
         if (textareaRef.current) textareaRef.current.value = ''
         useInputStore.getState().setText('')
         const firstLine = currentText.split('\n')[0].slice(0, 60)

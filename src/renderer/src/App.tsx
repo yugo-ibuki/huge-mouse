@@ -101,7 +101,6 @@ function App(): React.JSX.Element {
                           const sel = usePaneStore.getState().selected
                           const vm = useSettingsStore.getState().vimMode
                           await window.api.sendInput(sel, c.number, vm)
-                          useUiStore.getState().appendUserMessage(`${c.number}. ${c.label}`)
                           useUiStore.getState().flashStatus(`Sent ${c.number} → ${sel}`, true)
                         }}
                         onKeyDown={(e) => {
