@@ -16,6 +16,7 @@ export interface TmuxPane {
   pid: string
   command: string
   title: string
+  activityLine: string
 }
 
 export interface PaneDetail {

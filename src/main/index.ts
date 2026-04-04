@@ -19,7 +19,6 @@ import {
   gitDiff,
   getConversationLog
 } from './tmux'
-import type { ChatMessage } from './tmux'
 
 interface SkillEntry {
   name: string
@@ -79,11 +78,18 @@ function startStream(win: BrowserWindow, target: string, mode: 'raw' | 'chat'): 
     if (!streamTarget) return
     try {
       if (streamMode === 'chat') {
-        const messages: ChatMessage[] = await getConversationLog(streamTarget)
+        const [messages, content] = await Promise.all([
+          getConversationLog(streamTarget),
+          capturePane(streamTarget)
+        ])
         const json = JSON.stringify(messages)
         if (json !== lastChatJson) {
           lastChatJson = json
           win.webContents.send('tmux:chat-data', messages)
+        }
+        if (content !== lastStreamContent) {
+          lastStreamContent = content
+          win.webContents.send('tmux:stream-data', content)
         }
       } else {
         const content = await capturePane(streamTarget)

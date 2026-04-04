@@ -19,6 +19,7 @@ export interface TmuxPane {
   status: PaneStatus
   choices: TmuxChoice[]
   prompt: string
+  activityLine: string
 }
 
 // Strip ANSI escape sequences from captured pane content.
@@ -515,26 +516,49 @@ const CODEX_IDLE_INDICATORS = [
   /\bsend\b.*\bnewline\b.*\bquit\b/ // legacy format (backward compat)
 ]
 
+// Extract activity indicator line from pane content (e.g. "✻ Imagining… (17s · ↑ 107 tokens)")
+// These lines appear when Claude is actively processing.
+function parseActivityLine(content: string): string {
+  const lines = content.split('\n')
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 20); i--) {
+    const line = lines[i].trim()
+    if (!line) continue
+    // Match lines starting with activity indicator characters (✻, ⏺, braille spinners)
+    // followed by text containing ellipsis (…)
+    if (/^[✻⏺\u2800-\u28FF]/.test(line) && /…/.test(line)) {
+      return line
+    }
+  }
+  return ''
+}
+
 function detectStatusClaude(
   title: string,
   content: string
-): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+): { status: PaneStatus; choices: TmuxChoice[]; prompt: string; activityLine: string } {
   // Always check for choices first — permission prompts (e.g. "Do you want to proceed?
   // ❯ 1. Yes  2. No") can appear while the title still shows ⠂ (busy).
   const choices = parseChoices(content)
   if (choices.length > 0) {
-    return { status: 'waiting', choices, prompt: parsePrompt(content) }
+    return { status: 'waiting', choices, prompt: parsePrompt(content), activityLine: '' }
   }
 
-  if (!title.includes('✳')) return { status: 'busy', choices: [], prompt: '' }
+  if (!title.includes('✳')) {
+    return {
+      status: 'busy',
+      choices: [],
+      prompt: '',
+      activityLine: parseActivityLine(content)
+    }
+  }
 
   const lines = content.split('\n').slice(-10)
   for (const pattern of WAITING_PATTERNS) {
     if (lines.some((line) => pattern.test(line))) {
-      return { status: 'waiting', choices: [], prompt: parsePrompt(content) }
+      return { status: 'waiting', choices: [], prompt: parsePrompt(content), activityLine: '' }
     }
   }
-  return { status: 'idle', choices: [], prompt: '' }
+  return { status: 'idle', choices: [], prompt: '', activityLine: '' }
 }
 
 // Codex presents options as indented "- " list items
@@ -546,6 +570,7 @@ function detectStatusCodex(content: string): {
   status: PaneStatus
   choices: TmuxChoice[]
   prompt: string
+  activityLine: string
 } {
   const lines = content.split('\n').slice(-15)
   const tail = lines.join('\n')
@@ -553,7 +578,7 @@ function detectStatusCodex(content: string): {
   // 1. Check for explicit busy signals (-ing words or "esc to interrupt")
   const isBusy = CODEX_BUSY_PATTERNS.some((p) => p.test(tail))
   if (isBusy) {
-    return { status: 'busy', choices: [], prompt: '' }
+    return { status: 'busy', choices: [], prompt: '', activityLine: parseActivityLine(content) }
   }
 
   // 2. Check for explicit idle signals (footer hints)
@@ -562,22 +587,22 @@ function detectStatusCodex(content: string): {
     const hasQuestion = lines.some((line) => CODEX_QUESTION_PATTERN.test(line))
     const optionCount = lines.filter((line) => CODEX_OPTION_PATTERN.test(line)).length
     if (hasQuestion || optionCount >= 2) {
-      return { status: 'waiting', choices: [], prompt: '' }
+      return { status: 'waiting', choices: [], prompt: '', activityLine: '' }
     }
-    return { status: 'idle', choices: [], prompt: '' }
+    return { status: 'idle', choices: [], prompt: '', activityLine: '' }
   }
 
   // 3. No busy signal detected → default to idle (not busy).
   // If Codex is NOT showing "Working"/"Thinking"/etc,
   // it is most likely at the input prompt waiting for user input.
-  return { status: 'idle', choices: [], prompt: '' }
+  return { status: 'idle', choices: [], prompt: '', activityLine: '' }
 }
 
 function detectStatus(
   title: string,
   content: string,
   command: string
-): { status: PaneStatus; choices: TmuxChoice[]; prompt: string } {
+): { status: PaneStatus; choices: TmuxChoice[]; prompt: string; activityLine: string } {
   if (command === 'codex') return detectStatusCodex(content)
   return detectStatusClaude(title, content)
 }
@@ -600,7 +625,8 @@ export async function listPanes(): Promise<TmuxPane[]> {
         title,
         status: 'busy' as PaneStatus,
         choices: [] as TmuxChoice[],
-        prompt: ''
+        prompt: '',
+        activityLine: ''
       }
     })
     // Support popular wrappers like `ai` in addition to `claude` and `codex`.
@@ -639,6 +665,7 @@ export async function listPanes(): Promise<TmuxPane[]> {
       pane.status = result.status
       pane.choices = result.choices
       pane.prompt = result.prompt
+      pane.activityLine = result.activityLine
     })
   )
 

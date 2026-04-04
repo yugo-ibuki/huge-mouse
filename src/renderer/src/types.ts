@@ -38,6 +38,7 @@ export interface TmuxPane {
   status: 'idle' | 'busy' | 'waiting'
   choices: TmuxChoice[]
   prompt: string
+  activityLine: string
 }
 
 export interface ChatMessage {

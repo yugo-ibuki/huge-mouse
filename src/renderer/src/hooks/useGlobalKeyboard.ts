@@ -141,8 +141,9 @@ export function useGlobalKeyboard(
                 const msgs = await window.api.getConversationLog(target)
                 if (msgs.length > 0) {
                   useUiStore.getState().setChatMessages(msgs)
-                  // Use paneContent as a gate signal (non-null = preview open)
-                  useUiStore.getState().setPaneContent('__chat__')
+                  // Set raw capture as paneContent (used for LIVE raw fallback)
+                  const rawContent = await window.api.capturePane(target)
+                  useUiStore.getState().setPaneContent(rawContent || '__chat__')
                   requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
                       paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)

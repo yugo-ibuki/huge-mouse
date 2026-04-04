@@ -502,6 +502,39 @@
   }
 }
 
+/* ── Busy indicator ── */
+.busy-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  animation: status-fade-in 0.2s ease;
+}
+
+.busy-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.busy-text {
+  color: var(--text-dim);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ── Sidebar ── */
 .sidebar {
   width: 0;
@@ -902,6 +935,68 @@
   opacity: 0.5;
   text-align: right;
   margin-top: 2px;
+}
+
+/* ── Activity indicator in chat preview (shown when Claude is busy) ── */
+.chat-activity-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px dashed rgba(139, 92, 246, 0.3);
+  border-left: 3px solid rgba(139, 92, 246, 0.6);
+  animation: pulse-activity 2s ease-in-out infinite;
+}
+
+.pane-popup-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.raw-activity-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(139, 92, 246, 0.08);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+  flex-shrink: 0;
+  animation: pulse-activity 2s ease-in-out infinite;
+}
+
+.chat-activity-text {
+  font-size: var(--font-size, 12px);
+  font-family: var(--font-mono);
+  color: rgba(139, 92, 246, 0.9);
+}
+
+.chat-raw-preview {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+@keyframes pulse-activity {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* ── Current prompt in chat preview ── */

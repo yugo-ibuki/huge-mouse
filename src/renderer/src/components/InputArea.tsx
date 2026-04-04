@@ -9,12 +9,23 @@ function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
   const status = useUiStore((s) => s.status)
   const hasText = useInputStore((s) => s.text.trim().length > 0)
   const hasSelected = usePaneStore((s) => s.selected !== '')
+  const selectedPane = usePaneStore((s) => s.panes.find((p) => p.target === s.selected))
+  const isBusy = selectedPane?.status === 'busy'
+  const activityLine = selectedPane?.activityLine ?? ''
 
   return (
     <div className="footer">
-      {status && <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>}
-      <button className="send-btn" onClick={send} disabled={!hasSelected || !hasText}>
-        Send
+      {isBusy && (
+        <span className="busy-indicator">
+          <span className="busy-spinner" />
+          <span className="busy-text">{activityLine || 'Working...'}</span>
+        </span>
+      )}
+      {!isBusy && status && (
+        <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>
+      )}
+      <button className="send-btn" onClick={send} disabled={!hasSelected || !hasText || isBusy}>
+        {isBusy ? '...' : 'Send'}
       </button>
     </div>
   )
@@ -92,6 +103,7 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
       const result = await window.api.sendInput(currentSelected, currentText, currentVimMode)
       if (result.success) {
         useInputStore.getState().pushHistory(currentText)
+        useUiStore.getState().appendUserMessage(currentText)
         if (textareaRef.current) textareaRef.current.value = ''
         useInputStore.getState().setText('')
         const firstLine = currentText.split('\n')[0].slice(0, 60)
