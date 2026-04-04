@@ -1492,7 +1492,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 150px;
+  max-height: calc(var(--font-size, 13px) * 5 + 8px * 5);
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 4px;
