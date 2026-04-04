@@ -1,4 +1,5 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
+
 import type { SlashCommand, SkillCommand } from '../types'
 import { useInputStore } from '../stores/inputStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -80,14 +81,7 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
     const { selected: currentSelected } = usePaneStore.getState()
     if (!currentSelected || (!currentText.trim() && images.length === 0)) return
 
-    // Build final text: append image paths to the message
-    const imagePaths = images.map((p) => p).join(' ')
-    const finalText = imagePaths
-      ? currentText.trim()
-        ? `${currentText} ${imagePaths}`
-        : imagePaths
-      : currentText
-
+    const finalText = currentText
     const { shellMode: isShell } = useUiStore.getState()
 
     if (isShell) {
@@ -112,9 +106,10 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
       }
     } else {
       const currentVimMode = useSettingsStore.getState().vimMode
-      const result = await window.api.sendInput(currentSelected, finalText, currentVimMode)
+      const result = await window.api.sendInput(currentSelected, finalText, currentVimMode, images)
       if (result.success) {
-        useInputStore.getState().pushHistory(finalText)
+        const historyText = images.length > 0 ? `${finalText} [+${images.length} images]` : finalText
+        useInputStore.getState().pushHistory(historyText)
         if (textareaRef.current) textareaRef.current.value = ''
         useInputStore.getState().setText('')
         useInputStore.getState().clearImages()
@@ -243,13 +238,20 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
 
   const attachedImages = useInputStore((s) => s.images)
 
+  // Listen for image drops intercepted by main process
+  useEffect(() => {
+    return window.api.onImageDropped((paths) => {
+      useInputStore.getState().addImages(paths)
+    })
+  }, [])
+
   return (
     <>
       {attachedImages.length > 0 && (
         <div className="image-attachments">
           {attachedImages.map((img) => (
             <div key={img} className="image-thumb">
-              <img src={`file://${img}`} alt={img.split('/').pop()} />
+              <img src={`local-image://${img}`} alt={img.split('/').pop()} />
               <button
                 className="image-thumb-remove"
                 onClick={() => useInputStore.getState().removeImage(img)}
