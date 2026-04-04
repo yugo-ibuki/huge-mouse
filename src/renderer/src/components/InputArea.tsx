@@ -1,4 +1,5 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
+
 import type { SlashCommand, SkillCommand } from '../types'
 import { useInputStore } from '../stores/inputStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -8,10 +9,16 @@ import { useUiStore } from '../stores/uiStore'
 function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
   const status = useUiStore((s) => s.status)
   const hasText = useInputStore((s) => s.text.trim().length > 0)
+  const hasImages = useInputStore((s) => s.images.length > 0)
   const hasSelected = usePaneStore((s) => s.selected !== '')
   const selectedPane = usePaneStore((s) => s.panes.find((p) => p.target === s.selected))
   const isBusy = selectedPane?.status === 'busy'
   const activityLine = selectedPane?.activityLine ?? ''
+
+  const handleAttach = async (): Promise<void> => {
+    const paths = await window.api.selectImages()
+    if (paths.length > 0) useInputStore.getState().addImages(paths)
+  }
 
   return (
     <div className="footer">
@@ -24,7 +31,14 @@ function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
       {!isBusy && status && (
         <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>
       )}
-      <button className="send-btn" onClick={send} disabled={!hasSelected || !hasText || isBusy}>
+      <button className="attach-btn" onClick={handleAttach} title="Attach images">
+        +img
+      </button>
+      <button
+        className="send-btn"
+        onClick={send}
+        disabled={!hasSelected || (!hasText && !hasImages) || isBusy}
+      >
         {isBusy ? '...' : 'Send'}
       </button>
     </div>
@@ -74,9 +88,11 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
 
   const send = useCallback(async () => {
     const currentText = textareaRef.current?.value ?? ''
+    const { images } = useInputStore.getState()
     const { selected: currentSelected } = usePaneStore.getState()
-    if (!currentSelected || !currentText.trim()) return
+    if (!currentSelected || (!currentText.trim() && images.length === 0)) return
 
+    const finalText = currentText
     const { shellMode: isShell } = useUiStore.getState()
 
     if (isShell) {
@@ -88,24 +104,27 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
         useUiStore.getState().flashStatus(result.error ?? 'Failed to create shell pane', false)
         return
       }
-      const sendResult = await window.api.sendInput(result.target, currentText)
+      const sendResult = await window.api.sendInput(result.target, finalText)
       if (sendResult.success) {
-        useInputStore.getState().pushHistory(currentText)
-        useUiStore.getState().pushShellHistory(currentText)
+        useInputStore.getState().pushHistory(finalText)
+        useUiStore.getState().pushShellHistory(finalText)
         if (textareaRef.current) textareaRef.current.value = ''
         useInputStore.getState().setText('')
+        useInputStore.getState().clearImages()
         useUiStore.getState().flashStatus('Sent to shell!', true)
       } else {
         useUiStore.getState().flashStatus(sendResult.error ?? 'Failed', false)
       }
     } else {
       const currentVimMode = useSettingsStore.getState().vimMode
-      const result = await window.api.sendInput(currentSelected, currentText, currentVimMode)
+      const result = await window.api.sendInput(currentSelected, finalText, currentVimMode, images)
       if (result.success) {
-        useInputStore.getState().pushHistory(currentText)
+        const historyText = images.length > 0 ? `${finalText} [+${images.length} images]` : finalText
+        useInputStore.getState().pushHistory(historyText)
         if (textareaRef.current) textareaRef.current.value = ''
         useInputStore.getState().setText('')
-        const firstLine = currentText.split('\n')[0].slice(0, 60)
+        useInputStore.getState().clearImages()
+        const firstLine = finalText.split('\n')[0].slice(0, 60)
         usePaneStore.getState().updateLastPrompt(currentSelected, firstLine)
         useUiStore.getState().flashStatus('Sent!', true)
       } else {
@@ -114,27 +133,22 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
     }
   }, [textareaRef])
 
-  const handleTextChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const val = e.target.value
-      const store = useInputStore.getState()
-      store.setText(val)
-      const cmds = [
-        ...store.slashCommands,
-        ...store.skillCommands.filter(
-          (sk) => !store.slashCommands.some((uc) => uc.name === sk.name)
-        )
-      ]
-      const match = val.match(/^\/(\S*)$/)
-      if (match && cmds.length > 0) {
-        store.setSlashFilter(match[1])
-        store.setSlashIndex(0)
-      } else {
-        store.setSlashFilter(null)
-      }
-    },
-    []
-  )
+  const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    const store = useInputStore.getState()
+    store.setText(val)
+    const cmds = [
+      ...store.slashCommands,
+      ...store.skillCommands.filter((sk) => !store.slashCommands.some((uc) => uc.name === sk.name))
+    ]
+    const match = val.match(/^\/(\S*)$/)
+    if (match && cmds.length > 0) {
+      store.setSlashFilter(match[1])
+      store.setSlashIndex(0)
+    } else {
+      store.setSlashFilter(null)
+    }
+  }, [])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -233,8 +247,33 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
     [send, applySlashCommand]
   )
 
+  const attachedImages = useInputStore((s) => s.images)
+
+  // Listen for image drops intercepted by main process
+  useEffect(() => {
+    return window.api.onImageDropped((paths) => {
+      useInputStore.getState().addImages(paths)
+    })
+  }, [])
+
   return (
     <>
+      {attachedImages.length > 0 && (
+        <div className="image-attachments">
+          {attachedImages.map((img) => (
+            <div key={img} className="image-thumb">
+              <img src={`local-image://${img}`} alt={img.split('/').pop()} />
+              <button
+                className="image-thumb-remove"
+                onClick={() => useInputStore.getState().removeImage(img)}
+              >
+                x
+              </button>
+              <span className="image-thumb-name">{img.split('/').pop()}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="textarea-wrapper">
         <textarea
           ref={textareaRef}

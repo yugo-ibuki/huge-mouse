@@ -10,6 +10,7 @@ interface InputState {
   savedDraft: string
   slashCommands: SlashCommand[]
   skillCommands: SkillCommand[]
+  images: string[]
 }
 
 interface InputActions {
@@ -21,6 +22,9 @@ interface InputActions {
   setSlashCommands: (commands: SlashCommand[]) => void
   updateUserSkills: (skills: SkillCommand[]) => void
   updateProjectSkills: (skills: SkillCommand[]) => void
+  addImages: (paths: string[]) => void
+  removeImage: (path: string) => void
+  clearImages: () => void
 }
 
 const SLASH_COMMANDS_KEY = 'unitmux:slashCommands'
@@ -43,6 +47,7 @@ export const useInputStore = create<InputState & InputActions>((set, get) => ({
   savedDraft: '',
   slashCommands: loadSlashCommands(),
   skillCommands: [],
+  images: [],
 
   setText: (text) => set({ text }),
 
@@ -101,5 +106,13 @@ export const useInputStore = create<InputState & InputActions>((set, get) => ({
     const { skillCommands } = get()
     const userSkills = skillCommands.filter((c) => c.source === 'skill-user')
     set({ skillCommands: [...userSkills, ...skills] })
-  }
+  },
+
+  addImages: (paths) => {
+    const { images } = get()
+    const unique = paths.filter((p) => !images.includes(p))
+    if (unique.length > 0) set({ images: [...images, ...unique] })
+  },
+  removeImage: (path) => set({ images: get().images.filter((p) => p !== path) }),
+  clearImages: () => set({ images: [] })
 }))

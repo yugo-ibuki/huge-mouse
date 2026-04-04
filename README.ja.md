@@ -69,6 +69,7 @@ brew install --cask yugo-ibuki/tap/unitmux
 | `Ctrl+D`                    | セッション詳細ポップアップを表示（キーは設定で変更可能）                          |
 | `Ctrl+C`                    | セッションを終了（詳細パネル表示中、確認ダイアログあり）                          |
 | `Ctrl+G`                    | git操作ポップアップを表示（キーは設定で変更可能）                                 |
+| `Ctrl+F`                    | git diffビューアーを表示（キーは設定で変更可能）                                  |
 | `Ctrl+S`                    | セッションの実行を停止 — Escapeを送信して中断（キーは設定で変更可能）             |
 | `Ctrl+W`                    | コンパクトモード切り替え — タブバーだけの細い表示に（キーは設定で変更可能）       |
 | `Ctrl+N`                    | 新しいセッションを作成（tmuxセッションとコマンドを選択）                          |
@@ -114,6 +115,7 @@ brew install --cask yugo-ibuki/tap/unitmux
 - **Preview Key** — プレビュー表示のキーを変更（`Ctrl+<キー>`）
 - **Detail Key** — セッション詳細のキーを変更（`Ctrl+<キー>`）
 - **Git Key** — git操作のキーを変更（`Ctrl+<キー>`）
+- **Diff Key** — git diffビューアーのキーを変更（`Ctrl+<キー>`）
 - **Focus Key** — unitmuxにフォーカスするグローバルショートカットを変更（`Cmd+Shift+<キー>`）
 - **Slash Commands** — スラッシュコマンドの追加・編集・削除
 

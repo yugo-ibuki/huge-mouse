@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 export interface SkillEntry {
   name: string
@@ -36,8 +36,8 @@ export interface SendResult {
 
 const api = {
   listSessions: (): Promise<TmuxPane[]> => ipcRenderer.invoke('tmux:list-sessions'),
-  sendInput: (target: string, text: string, vimMode = false): Promise<SendResult> =>
-    ipcRenderer.invoke('tmux:send-input', { target, text, vimMode }),
+  sendInput: (target: string, text: string, vimMode = false, images: string[] = []): Promise<SendResult> =>
+    ipcRenderer.invoke('tmux:send-input', { target, text, vimMode, images }),
   capturePane: (target: string): Promise<string> => ipcRenderer.invoke('tmux:capture-pane', target),
   getPaneDetail: (target: string): Promise<PaneDetail | null> =>
     ipcRenderer.invoke('tmux:pane-detail', target),
@@ -82,6 +82,12 @@ const api = {
     const handler = (_event: unknown, content: string): void => callback(content)
     ipcRenderer.on('tmux:stream-data', handler)
     return () => ipcRenderer.removeListener('tmux:stream-data', handler)
+  },
+  selectImages: (): Promise<string[]> => ipcRenderer.invoke('dialog:open-image'),
+  onImageDropped: (callback: (paths: string[]) => void): (() => void) => {
+    const handler = (_event: unknown, paths: string[]): void => callback(paths)
+    ipcRenderer.on('image-dropped', handler)
+    return () => ipcRenderer.removeListener('image-dropped', handler)
   }
 }
 
@@ -91,3 +97,30 @@ if (process.contextIsolated) {
   // @ts-ignore (define in dts)
   window.api = api
 }
+
+// Prevent Electron from navigating to dropped files & capture image drops
+window.addEventListener('DOMContentLoaded', () => {
+  const imageExt = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
+
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+  })
+
+  document.addEventListener('drop', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const paths: string[] = []
+    if (e.dataTransfer) {
+      for (const file of Array.from(e.dataTransfer.files)) {
+        const filePath = webUtils.getPathForFile(file)
+        if (filePath && imageExt.test(filePath)) {
+          paths.push(filePath)
+        }
+      }
+    }
+    if (paths.length > 0) {
+      ipcRenderer.send('image-dropped-from-renderer', paths)
+    }
+  })
+})

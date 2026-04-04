@@ -50,7 +50,7 @@ interface TmuxAPI {
   killPane: (target: string) => Promise<SendResult>
   findShellPane: (session: string) => Promise<string | null>
   ensureShellPane: (session: string, cwd: string) => Promise<{ success: boolean; target?: string; error?: string }>
-  sendInput: (target: string, text: string, vimMode?: boolean) => Promise<SendResult>
+  sendInput: (target: string, text: string, vimMode?: boolean, images?: string[]) => Promise<SendResult>
   capturePane: (target: string) => Promise<string>
   getPaneDetail: (target: string) => Promise<PaneDetail | null>
   listTmuxSessions: () => Promise<string[]>
@@ -71,6 +71,8 @@ interface TmuxAPI {
   startStream: (target: string) => Promise<boolean>
   stopStream: () => Promise<boolean>
   onStreamData: (callback: (content: string) => void) => () => void
+  selectImages: () => Promise<string[]>
+  onImageDropped: (callback: (paths: string[]) => void) => () => void
 }
 
 declare global {

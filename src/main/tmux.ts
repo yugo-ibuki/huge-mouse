@@ -595,7 +595,8 @@ const TARGET_PATTERN = /^[a-zA-Z0-9_-]+:\d+\.\d+$/
 export async function sendInput(
   target: string,
   text: string,
-  vimMode = false
+  vimMode = false,
+  images: string[] = []
 ): Promise<{ success: boolean; error?: string }> {
   if (!TARGET_PATTERN.test(target)) {
     return { success: false, error: 'Invalid target format' }
@@ -626,13 +627,22 @@ export async function sendInput(
       await new Promise((r) => setTimeout(r, 100))
     }
 
+    // Send image paths as bracketed paste so Claude CLI detects them as images
+    if (images.length > 0) {
+      const imagePaths = images.join(' ')
+      await run(['send-keys', '-t', target, '\x1b[200~'])
+      await run(['send-keys', '-t', target, '-l', imagePaths])
+      await run(['send-keys', '-t', target, '\x1b[201~'])
+      await new Promise((r) => setTimeout(r, 500))
+    }
+
     const isCodex = command === 'codex'
     const hasNewlines = text.includes('\n')
 
     if (isCodex) {
       // Codex ignores Enter from external tmux clients. Use run-shell
       // to execute send-keys from within the tmux server process itself.
-      await run(['send-keys', '-t', target, '-l', text])
+      if (text) await run(['send-keys', '-t', target, '-l', text])
       await run(['run-shell', `${tmuxBin} send-keys -t ${target} Enter`])
     } else if (hasNewlines) {
       // Send bracketed paste escape sequences to preserve newlines
@@ -642,8 +652,11 @@ export async function sendInput(
       await run(['send-keys', '-t', target, '\x1b[201~'])
       await new Promise((r) => setTimeout(r, 300))
       await run(['send-keys', '-t', target, '', 'Enter'])
-    } else {
+    } else if (text) {
       await run(['send-keys', '-t', target, '-l', text])
+      await run(['send-keys', '-t', target, 'Enter'])
+    } else {
+      // Images only, no text — just send Enter to submit
       await run(['send-keys', '-t', target, 'Enter'])
     }
     return { success: true }
