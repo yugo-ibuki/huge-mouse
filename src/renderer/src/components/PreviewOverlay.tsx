@@ -57,6 +57,7 @@ export function PreviewOverlay({
   const shellHistory = useUiStore((s) => s.shellHistory)
   const chatMessages = useUiStore((s) => s.chatMessages)
   const setChatMessages = useUiStore((s) => s.setChatMessages)
+  const pendingUserMessage = useUiStore((s) => s.pendingUserMessage)
   const selected = usePaneStore((s) => s.selected)
   const currentPane = usePaneStore((s) => s.panes.find((p) => p.target === s.selected))
   const previewKey = useSettingsStore((s) => s.previewKey)
@@ -144,6 +145,26 @@ export function PreviewOverlay({
             {chatMessages.map((msg, i) => (
               <ChatBubble key={i} msg={msg} index={i} />
             ))}
+            {pendingUserMessage &&
+              !chatMessages.some(
+                (m) => m.role === 'user' && m.text === pendingUserMessage.text
+              ) && (
+                <ChatBubble
+                  msg={pendingUserMessage}
+                  index={chatMessages.length}
+                />
+              )}
+            {currentPane?.status === 'busy' && (
+              <div className="chat-activity-indicator">
+                <span className="busy-spinner" />
+                <span className="chat-activity-text">
+                  {currentPane.activityLine || 'Working...'}
+                </span>
+              </div>
+            )}
+            {streaming && paneContent && paneContent !== '__chat__' && (
+              <pre className="chat-raw-preview">{paneContent}</pre>
+            )}
             {currentPane?.status === 'waiting' && currentPane.prompt && (
               <div className="chat-current-prompt">
                 <div className="chat-current-prompt-label">Waiting for response</div>
@@ -161,6 +182,15 @@ export function PreviewOverlay({
             )}
           </div>
         ) : (
+          <div className="pane-popup-content-wrapper">
+            {currentPane?.status === 'busy' && (
+              <div className="raw-activity-indicator">
+                <span className="busy-spinner" />
+                <span className="busy-text">
+                  {currentPane.activityLine || 'Working...'}
+                </span>
+              </div>
+            )}
           <pre
             ref={paneViewerRef}
             className="pane-popup-content"
@@ -199,6 +229,7 @@ export function PreviewOverlay({
               )
             })()}
           </pre>
+          </div>
         )}
       </div>
     </div>

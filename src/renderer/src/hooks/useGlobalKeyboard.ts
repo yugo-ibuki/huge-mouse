@@ -141,8 +141,9 @@ export function useGlobalKeyboard(
                 const msgs = await window.api.getConversationLog(target)
                 if (msgs.length > 0) {
                   useUiStore.getState().setChatMessages(msgs)
-                  // Use paneContent as a gate signal (non-null = preview open)
-                  useUiStore.getState().setPaneContent('__chat__')
+                  // Set raw capture as paneContent (used for LIVE raw fallback)
+                  const rawContent = await window.api.capturePane(target)
+                  useUiStore.getState().setPaneContent(rawContent || '__chat__')
                   requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
                       paneViewerRef.current?.scrollTo(0, paneViewerRef.current.scrollHeight)
@@ -248,6 +249,21 @@ export function useGlobalKeyboard(
         e.preventDefault()
         const { helpOpen, setHelpOpen } = useUiStore.getState()
         setHelpOpen(!helpOpen)
+        return
+      }
+
+      // Ctrl+Shift+N → open create dialog with all tmux sessions (including those without claude/codex)
+      if (e.ctrlKey && e.shiftKey && (e.key === 'N' || e.key === 'n') && !e.metaKey) {
+        e.preventDefault()
+        window.api.listTmuxSessions().then((sessions) => {
+          const ui = useUiStore.getState()
+          ui.setTmuxSessions(sessions)
+          if (sessions.length > 0) {
+            const currentSession = selected ? selected.split(':')[0] : ''
+            ui.setNewSessionTarget(sessions.includes(currentSession) ? currentSession : sessions[0])
+          }
+          ui.setCreateDialog(true)
+        })
         return
       }
 

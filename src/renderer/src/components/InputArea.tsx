@@ -11,6 +11,9 @@ function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
   const hasText = useInputStore((s) => s.text.trim().length > 0)
   const hasImages = useInputStore((s) => s.images.length > 0)
   const hasSelected = usePaneStore((s) => s.selected !== '')
+  const selectedPane = usePaneStore((s) => s.panes.find((p) => p.target === s.selected))
+  const isBusy = selectedPane?.status === 'busy'
+  const activityLine = selectedPane?.activityLine ?? ''
 
   const handleAttach = async (): Promise<void> => {
     const paths = await window.api.selectImages()
@@ -19,16 +22,24 @@ function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
 
   return (
     <div className="footer">
-      {status && <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>}
+      {isBusy && (
+        <span className="busy-indicator">
+          <span className="busy-spinner" />
+          <span className="busy-text">{activityLine || 'Working...'}</span>
+        </span>
+      )}
+      {!isBusy && status && (
+        <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>
+      )}
       <button className="attach-btn" onClick={handleAttach} title="Attach images">
         +img
       </button>
       <button
         className="send-btn"
         onClick={send}
-        disabled={!hasSelected || (!hasText && !hasImages)}
+        disabled={!hasSelected || (!hasText && !hasImages) || isBusy}
       >
-        Send
+        {isBusy ? '...' : 'Send'}
       </button>
     </div>
   )
@@ -110,6 +121,7 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
       if (result.success) {
         const historyText = images.length > 0 ? `${finalText} [+${images.length} images]` : finalText
         useInputStore.getState().pushHistory(historyText)
+        useUiStore.getState().appendUserMessage(finalText)
         if (textareaRef.current) textareaRef.current.value = ''
         useInputStore.getState().setText('')
         useInputStore.getState().clearImages()
