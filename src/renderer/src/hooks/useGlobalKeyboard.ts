@@ -252,6 +252,21 @@ export function useGlobalKeyboard(
         return
       }
 
+      // Ctrl+Shift+N → open create dialog with all tmux sessions (including those without claude/codex)
+      if (e.ctrlKey && e.shiftKey && (e.key === 'N' || e.key === 'n') && !e.metaKey) {
+        e.preventDefault()
+        window.api.listTmuxSessions().then((sessions) => {
+          const ui = useUiStore.getState()
+          ui.setTmuxSessions(sessions)
+          if (sessions.length > 0) {
+            const currentSession = selected ? selected.split(':')[0] : ''
+            ui.setNewSessionTarget(sessions.includes(currentSession) ? currentSession : sessions[0])
+          }
+          ui.setCreateDialog(true)
+        })
+        return
+      }
+
       // Ctrl+N → create new claude session in current pane's session & cwd
       if (e.ctrlKey && e.key === 'n' && !e.metaKey) {
         e.preventDefault()

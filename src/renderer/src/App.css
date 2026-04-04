@@ -1488,13 +1488,44 @@
   gap: 10px;
 }
 
-.create-session-select {
-  background: var(--bg-surface);
-  color: var(--fg);
+.create-session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: calc(var(--font-size, 13px) * 5 + 8px * 5);
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 4px 8px;
+  background: var(--bg-surface);
+}
+
+.create-session-item {
+  padding: 4px 10px;
   font-size: var(--font-size);
+  color: var(--fg);
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.create-session-item:hover {
+  background: var(--bg-hover);
+}
+
+.create-session-item-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.create-session-item-active:hover {
+  background: var(--accent-hover);
+}
+
+.create-dialog-hint {
+  font-size: 10px;
+  color: var(--fg-muted);
+  margin-left: auto;
+  margin-right: 8px;
+  white-space: nowrap;
 }
 
 .create-session-btn {
@@ -1573,28 +1604,6 @@
   50% {
     opacity: 0.5;
   }
-}
-
-/* Create session dialog */
-.create-session-form {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.create-session-select {
-  background: var(--bg-surface);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: var(--font-size);
-}
-
-.create-session-btn {
-  align-self: flex-end;
-  padding: 6px 20px;
 }
 
 /* Detail panel kill button */
