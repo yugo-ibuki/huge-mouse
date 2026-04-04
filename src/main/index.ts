@@ -17,6 +17,7 @@ import {
   findShellPane,
   ensureShellPane,
   gitDiff,
+  getConversationText
 } from './tmux'
 
 interface SkillEntry {
@@ -59,10 +60,16 @@ async function listSkillsFromDir(baseDir: string): Promise<SkillEntry[]> {
   }
 }
 
-// Streaming state: polls capture-pane and pushes content to renderer
+// Streaming state: polls capture-pane (+ JSONL history) and pushes content to renderer
 let streamTarget: string | null = null
 let streamTimer: ReturnType<typeof setInterval> | null = null
 let lastStreamContent = ''
+
+function combineHistoryAndCapture(history: string, capture: string): string {
+  if (!history) return capture
+  if (!capture) return history
+  return history + '\n\n── live ──────────────────────\n\n' + capture
+}
 
 function startStream(win: BrowserWindow, target: string): void {
   stopStream()
@@ -72,7 +79,11 @@ function startStream(win: BrowserWindow, target: string): void {
   const tick = async (): Promise<void> => {
     if (!streamTarget) return
     try {
-      const content = await capturePane(streamTarget)
+      const [history, capture] = await Promise.all([
+        getConversationText(streamTarget),
+        capturePane(streamTarget)
+      ])
+      const content = combineHistoryAndCapture(history, capture)
       if (content !== lastStreamContent) {
         lastStreamContent = content
         win.webContents.send('tmux:stream-data', content)
@@ -169,7 +180,11 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('tmux:capture-pane', async (_event, target: string) => {
-    return capturePane(target)
+    const [history, capture] = await Promise.all([
+      getConversationText(target),
+      capturePane(target)
+    ])
+    return combineHistoryAndCapture(history, capture)
   })
 
   ipcMain.handle('tmux:start-stream', async (_event, arg: string) => {

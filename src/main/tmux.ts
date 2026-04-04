@@ -1,5 +1,8 @@
 import { execFile } from 'child_process'
 import { existsSync } from 'fs'
+import { readFile, readdir } from 'fs/promises'
+import { homedir } from 'os'
+import { join } from 'path'
 
 export type PaneStatus = 'idle' | 'busy' | 'waiting'
 
@@ -31,6 +34,140 @@ const RE_MODE = new RegExp(ESC + '[>=]', 'g')
 
 function stripAnsi(text: string): string {
   return text.replace(RE_CSI, '').replace(RE_OSC, '').replace(RE_CHARSET, '').replace(RE_MODE, '')
+}
+
+// ── JSONL conversation history (used to supplement raw capture) ──
+
+function encodeCwd(cwd: string): string {
+  return cwd.replace(/[/.]/g, '-')
+}
+
+async function findDescendantPids(pid: string, maxDepth = 3): Promise<string[]> {
+  const result: string[] = []
+  const queue: { pid: string; depth: number }[] = [{ pid, depth: 0 }]
+  while (queue.length > 0) {
+    const item = queue.shift()!
+    if (item.depth >= maxDepth) continue
+    try {
+      const output = await new Promise<string>((resolve, reject) => {
+        execFile('pgrep', ['-P', item.pid], (err, stdout) => {
+          if (err) reject(err)
+          else resolve(stdout)
+        })
+      })
+      for (const line of output.trim().split('\n')) {
+        const childPid = line.trim()
+        if (childPid) {
+          result.push(childPid)
+          queue.push({ pid: childPid, depth: item.depth + 1 })
+        }
+      }
+    } catch {
+      // pgrep returns exit code 1 when no children found
+    }
+  }
+  return result
+}
+
+async function findSessionJsonl(target: string): Promise<string | null> {
+  try {
+    const info = await run([
+      'display-message',
+      '-t',
+      target,
+      '-p',
+      '#{pane_pid}|#{pane_current_path}'
+    ])
+    const [pid, cwd] = info.trim().split('|')
+    const claudeDir = join(homedir(), '.claude')
+    const sessionsDir = join(claudeDir, 'sessions')
+
+    const resolveByPid = async (p: string): Promise<string | null> => {
+      try {
+        const data = JSON.parse(await readFile(join(sessionsDir, `${p}.json`), 'utf-8'))
+        return join(claudeDir, 'projects', encodeCwd(data.cwd), `${data.sessionId}.jsonl`)
+      } catch {
+        return null
+      }
+    }
+
+    const direct = await resolveByPid(pid)
+    if (direct) return direct
+
+    try {
+      const descendants = await findDescendantPids(pid)
+      for (const childPid of descendants) {
+        const match = await resolveByPid(childPid)
+        if (match) return match
+      }
+    } catch {
+      // process tree walk failed
+    }
+
+    try {
+      const files = await readdir(sessionsDir)
+      let best: { path: string; startedAt: number } | null = null
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue
+        try {
+          const data = JSON.parse(await readFile(join(sessionsDir, file), 'utf-8'))
+          if (data.cwd === cwd) {
+            const jsonlPath = join(claudeDir, 'projects', encodeCwd(data.cwd), `${data.sessionId}.jsonl`)
+            if (existsSync(jsonlPath) && (!best || data.startedAt > best.startedAt)) {
+              best = { path: jsonlPath, startedAt: data.startedAt }
+            }
+          }
+        } catch {
+          /* skip */
+        }
+      }
+      return best?.path ?? null
+    } catch {
+      return null
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Read JSONL conversation log and return it as plain text.
+ * Used to supplement raw capture-pane output with scrollback history.
+ */
+export async function getConversationText(target: string): Promise<string> {
+  const jsonlPath = await findSessionJsonl(target)
+  if (!jsonlPath) return ''
+
+  try {
+    const raw = await readFile(jsonlPath, 'utf-8')
+    const parts: string[] = []
+
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const record = JSON.parse(line)
+        if (record.type === 'user' && record.message?.role === 'user') {
+          const text =
+            typeof record.message.content === 'string' ? record.message.content.trim() : ''
+          if (text) parts.push(`> ${text}`)
+        } else if (record.type === 'assistant' && record.message?.role === 'assistant') {
+          const blocks = record.message.content
+          if (!Array.isArray(blocks)) continue
+          for (const block of blocks) {
+            if (block.type === 'text' && block.text?.trim()) {
+              parts.push(block.text.trim())
+            }
+          }
+        }
+      } catch {
+        /* skip malformed lines */
+      }
+    }
+
+    return parts.join('\n\n')
+  } catch {
+    return ''
+  }
 }
 
 const TMUX_PATHS = ['/opt/homebrew/bin/tmux', '/usr/local/bin/tmux', '/usr/bin/tmux']

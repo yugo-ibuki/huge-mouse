@@ -110,10 +110,9 @@ export function PreviewOverlay({
                   )
                 })
               }
-              // Find last response marker: ⏺ at start of a line.
-              const markerMatch = paneContent.match(/\n\s*⏺[^]*$/)
-              if (!markerMatch || markerMatch.index === undefined) return paneContent
-              const lastIdx = markerMatch.index
+              // Find the LAST ⏺ marker to highlight only the most recent response.
+              const lastIdx = paneContent.lastIndexOf('\n', paneContent.lastIndexOf('⏺') - 1)
+              if (lastIdx < 0 || paneContent.lastIndexOf('⏺') < 0) return paneContent
               const before = paneContent.slice(0, lastIdx + 1)
               const after = paneContent.slice(lastIdx + 1)
               return (
