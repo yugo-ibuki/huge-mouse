@@ -30,7 +30,9 @@ export const PaneHeader = memo(function PaneHeader(): React.JSX.Element {
         {panes.length === 0 && <span className="no-sessions">No sessions found</span>}
         {Object.entries(groups).map(([session, group]) => (
           <div key={session} className="session-group">
-            <span className="session-label">{session}</span>
+            <button className="session-label" onClick={() => setSelected(group[0].target)}>
+              {session}
+            </button>
             {group.map((p) => (
               <div key={p.target} className="tag-row">
                 <button
