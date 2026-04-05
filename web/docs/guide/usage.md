@@ -16,7 +16,7 @@ Panes are grouped by their tmux session name. Each group shows the session name 
 
 ## Sending Input
 
-Select a pane from the tags at the top, type your message in the textarea, and press `Cmd+Enter` to send (the send key is configurable in Settings). The input is delivered directly to the tmux pane via `send-keys`.
+Select a pane from the tags at the top, type your message in the textarea, and press `Cmd+Enter` to send (the send key is configurable in Settings).
 
 ## Responding to Choices
 
@@ -75,7 +75,7 @@ Click the "+" button or drag & drop images onto the window to attach them.
 
 - Supported formats: PNG, JPG, GIF, WebP, SVG, BMP
 - Images show as thumbnails before sending, with a remove button on hover
-- Images are sent to Claude CLI so the CLI recognizes them as image files
+- Attached images are sent along with your message
 
 ## Shell Mode
 
