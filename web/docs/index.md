@@ -15,8 +15,8 @@ hero:
 
 features:
   - icon: 🖱️
-    title: Why "mouse"?
-    details: Manage multiple AI sessions without ever touching your mouse. The irony is in the name — a tool called "mouse" that frees you from the mouse.
+    title: Why "unitmux"?
+    details: '"unit" + "tmux" — unite your AI sessions in tmux into a single control panel. Manage multiple AI agents without ever touching your mouse.'
   - icon: 🔍
     title: Auto-Discovery
     details: Automatically finds all AI panes running in tmux. No configuration needed — just open the app and start typing.

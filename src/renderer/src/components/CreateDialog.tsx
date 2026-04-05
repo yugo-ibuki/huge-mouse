@@ -88,6 +88,7 @@ export function CreateDialog(): React.JSX.Element | null {
   if (!createDialog) return null
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.nativeEvent.isComposing) return
     if ((e.target as HTMLElement).tagName === 'INPUT') return
 
     switch (e.key) {
@@ -186,7 +187,9 @@ export function CreateDialog(): React.JSX.Element | null {
                 onChange={(e) => setSessionName(e.target.value)}
                 onKeyDown={(e) => {
                   e.stopPropagation()
+                  if (e.nativeEvent.isComposing) return
                   if (e.key === 'Enter' && sessionName.trim()) {
+                    e.preventDefault()
                     handleCreateNew()
                   }
                   if (e.key === 'Escape') {
