@@ -15,10 +15,7 @@ export default defineConfig({
     ]
   ],
   themeConfig: {
-    nav: [
-      { text: 'Guide', link: '/guide/getting-started' },
-      { text: 'GitHub', link: 'https://github.com/yugo-ibuki/unitmux' }
-    ],
+    nav: [{ text: 'Guide', link: '/guide/getting-started' }],
     sidebar: [
       {
         text: 'Guide',
