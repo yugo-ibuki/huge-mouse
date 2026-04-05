@@ -2,7 +2,7 @@
 
 ## Slash Commands
 
-Type `/` in the input area to open the autocomplete menu. Custom commands can be defined and are persisted in localStorage.
+Type `/` in the input area to open the autocomplete menu. Custom commands can be defined and are saved automatically.
 
 ## Skill Commands
 

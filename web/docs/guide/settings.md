@@ -37,4 +37,4 @@ When enabled, unitmux sends `Escape` followed by `i` before delivering your inpu
 
 Click the current key binding button (e.g., `Ctrl+P`) to enter key capture mode. Press any letter key to set the new binding. Press `Escape` to cancel.
 
-All settings are persisted in `localStorage` and survive app restarts.
+All settings are saved automatically and survive app restarts.
