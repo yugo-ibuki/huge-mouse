@@ -322,12 +322,12 @@ function parseChoices(content: string): TmuxChoice[] {
   while (allLines.length > 0 && allLines[allLines.length - 1].trim() === '') {
     allLines.pop()
   }
-  // Strip CLI footer lines (separator ─{5,}, session/model info, prompt cursor, mode indicator)
+  // Strip CLI footer lines (separator lines of pure dashes, session/model info, prompt cursor, mode indicator)
   // so that the "last 20 lines" window reaches the actual content area.
   while (allLines.length > 0) {
     const last = allLines[allLines.length - 1]
     if (
-      /─{5,}/.test(last) ||
+      /^\s*─{5,}\s*$/.test(last) ||
       /^\s*(Session|Model)\b/.test(last) ||
       /^\s*❯\s*$/.test(last) ||
       /\b(plan|compact) mode\b/.test(last)
@@ -849,7 +849,7 @@ function trimCliFooter(output: string): string {
   while (lines.length > 0) {
     const last = lines[lines.length - 1]
     if (
-      /─{5,}/.test(last) ||
+      /^\s*─{5,}\s*$/.test(last) ||
       /^\s*(Session|Model)\b/.test(last) ||
       /^\s*❯\s*$/.test(last) ||
       /\b(plan|compact) mode\b/.test(last) ||

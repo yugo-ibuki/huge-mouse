@@ -87,6 +87,11 @@ function startStream(win: BrowserWindow, target: string): void {
       ])
       const content = combineHistoryAndCapture(history, capture)
       if (content !== lastStreamContent) {
+        // Skip if content shrank significantly — likely a mid-redraw capture
+        // (TUI flicker). Allow small shrinkage for trimCliFooter variance.
+        if (lastStreamContent && content.length < lastStreamContent.length * 0.8) {
+          return
+        }
         lastStreamContent = content
         win.webContents.send('tmux:stream-data', content)
       }
