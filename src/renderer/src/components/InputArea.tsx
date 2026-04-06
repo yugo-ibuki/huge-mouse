@@ -57,6 +57,7 @@ interface InputAreaProps {
 }
 
 export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
+  const text = useInputStore((s) => s.text)
   const slashFilter = useInputStore((s) => s.slashFilter)
   const slashIndex = useInputStore((s) => s.slashIndex)
   const slashCommands = useInputStore((s) => s.slashCommands)
@@ -84,7 +85,6 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
     (cmd: SlashCommand | SkillCommand) => {
       const isSkill = 'source' in cmd
       const val = isSkill ? `/${cmd.name}` : cmd.body
-      if (textareaRef.current) textareaRef.current.value = val
       useInputStore.getState().setText(val)
       useInputStore.getState().setSlashFilter(null)
       useInputStore.getState().setSlashIndex(0)
@@ -94,8 +94,7 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
   )
 
   const send = useCallback(async () => {
-    const currentText = textareaRef.current?.value ?? ''
-    const { images } = useInputStore.getState()
+    const { text: currentText, images } = useInputStore.getState()
     const { selected: currentSelected } = usePaneStore.getState()
     if (!currentSelected || (!currentText.trim() && images.length === 0)) return
 
@@ -115,7 +114,6 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
       if (sendResult.success) {
         useInputStore.getState().pushHistory(finalText)
         useUiStore.getState().pushShellHistory(finalText)
-        if (textareaRef.current) textareaRef.current.value = ''
         useInputStore.getState().setText('')
         useInputStore.getState().clearImages()
         useUiStore.getState().flashStatus('Sent to shell!', true)
@@ -128,7 +126,6 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
       if (result.success) {
         const historyText = images.length > 0 ? `${finalText} [+${images.length} images]` : finalText
         useInputStore.getState().pushHistory(historyText)
-        if (textareaRef.current) textareaRef.current.value = ''
         useInputStore.getState().setText('')
         useInputStore.getState().clearImages()
         const firstLine = finalText.split('\n')[0].slice(0, 60)
@@ -138,7 +135,7 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
         useUiStore.getState().flashStatus(result.error ?? 'Failed', false)
       }
     }
-  }, [textareaRef])
+  }, [])
 
   const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
@@ -213,11 +210,13 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
           const ta = e.currentTarget as HTMLTextAreaElement
           const start = ta.selectionStart
           const end = ta.selectionEnd
-          const val = ta.value
+          const val = store.text
           const newVal = val.substring(0, start) + '\n' + val.substring(end)
-          ta.value = newVal
-          ta.selectionStart = ta.selectionEnd = start + 1
           store.setText(newVal)
+          const cursorPos = start + 1
+          requestAnimationFrame(() => {
+            ta.selectionStart = ta.selectionEnd = cursorPos
+          })
           return
         }
       }
@@ -226,26 +225,24 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
 
       if (e.key === 'ArrowUp' && !e.metaKey && history.length > 0) {
         const ta = e.currentTarget as HTMLTextAreaElement
-        const isAtTop = !ta.value.includes('\n') || ta.selectionStart === 0
+        const storeText = useInputStore.getState().text
+        const isAtTop = !storeText.includes('\n') || ta.selectionStart === 0
         if (isAtTop) {
           e.preventDefault()
-          const currentText = ta.value
-          const next = useInputStore.getState().navigateHistory('up', currentText)
+          const next = useInputStore.getState().navigateHistory('up', storeText)
           if (next !== null) {
-            ta.value = next
             useInputStore.getState().setText(next)
           }
         }
       }
       if (e.key === 'ArrowDown' && !e.metaKey && historyIndex >= 0) {
         const ta = e.currentTarget as HTMLTextAreaElement
-        const isAtBottom = !ta.value.includes('\n') || ta.selectionStart === ta.value.length
+        const storeText = useInputStore.getState().text
+        const isAtBottom = !storeText.includes('\n') || ta.selectionStart === storeText.length
         if (isAtBottom) {
           e.preventDefault()
-          const currentText = ta.value
-          const next = useInputStore.getState().navigateHistory('down', currentText)
+          const next = useInputStore.getState().navigateHistory('down', storeText)
           if (next !== null) {
-            ta.value = next
             useInputStore.getState().setText(next)
           }
         }
@@ -286,6 +283,7 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
           ref={textareaRef}
           className="textarea"
           rows={5}
+          value={text}
           placeholder={
             shellMode
               ? 'Type shell command... (Enter to send)'
