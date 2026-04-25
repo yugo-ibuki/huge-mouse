@@ -1945,7 +1945,87 @@
 }
 
 /* ── Diff viewer ── */
+.diff-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.diff-sidebar {
+  width: 168px;
+  max-width: 28%;
+  flex-shrink: 0;
+  overflow: auto;
+  padding: 4px 0;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.diff-sidebar-empty {
+  padding: 14px 10px;
+  color: var(--text-dim);
+  font-size: 10px;
+  text-align: center;
+}
+
+.diff-sidebar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  min-width: 100%;
+  min-height: 27px;
+  padding: 4px 8px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.diff-sidebar-row:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.diff-sidebar-row-active {
+  border-left-color: var(--accent);
+  background: var(--accent-muted);
+  color: var(--text);
+}
+
+.diff-sidebar-status {
+  width: 10px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+.diff-sidebar-path {
+  flex: 0 0 auto;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.diff-sidebar-stats {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 600;
+}
+
 .diff-content {
+  flex: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 4px 0;
   white-space: normal;

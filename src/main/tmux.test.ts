@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { _testInternals } from './tmux'
 
-const { parseChoices, detectStatusClaude, trimCliFooter } = _testInternals
+const { parseChoices, detectStatus, detectStatusClaude, detectStatusCodex, trimCliFooter } =
+  _testInternals
 
 describe('parseChoices', () => {
   it('detects marker-style choices (❯ 1. Yes / 2. No)', () => {
@@ -204,6 +205,135 @@ describe('detectStatusClaude', () => {
 
     const result = detectStatusClaude('✳ Claude Code', content)
     expect(result.status).toBe('waiting')
+  })
+})
+
+describe('detectStatusCodex', () => {
+  it('returns waiting with choices for Codex permission prompts with a selected marker', () => {
+    const content = [
+      'Would you like to run the following command?',
+      '',
+      '  Reason: Codex ペインの実際の表示文字列を読み、選択肢パーサが外れる原因を確認してよいですか？',
+      '',
+      '  $ tmux capture-pane -t brew-tap:1.0 -p -S -120',
+      '',
+      '  1. Yes, proceed (y)',
+      "› 2. Yes, and don't ask again for commands that start with `tmux capture-pane` (p)",
+      '  3. No, and tell Codex what to do differently (esc)'
+    ].join('\n')
+
+    const result = detectStatusCodex(content)
+
+    expect(result.status).toBe('waiting')
+    expect(result.choices).toEqual([
+      { number: '1', label: 'Yes, proceed (y)' },
+      {
+        number: '2',
+        label: "Yes, and don't ask again for commands that start with `tmux capture-pane` (p)"
+      },
+      { number: '3', label: 'No, and tell Codex what to do differently (esc)' }
+    ])
+  })
+
+  it('returns waiting with choices for Codex numbered option prompts', () => {
+    const content = [
+      'この設計で進めてよければ実装に入ります。',
+      '',
+      '  1. 左ペインはファイル一覧だけ',
+      '     modified/path.ts +12 -3 のように表示し、j/k または n/N で移動、Enter/o で開閉、クリックでジャンプ。',
+      '  2. ディレクトリツリー風に折りたたむ',
+      '     src/renderer/... をツリー化します。',
+      '  3. Git overlay と同じ行リストを差分内に再利用',
+      '     見た目の統一はしやすいですが、責務が違います。',
+      '',
+      'おすすめは 1 です。'
+    ].join('\n')
+
+    const result = detectStatusCodex(content)
+
+    expect(result.status).toBe('waiting')
+    expect(result.choices).toEqual([
+      { number: '1', label: '左ペインはファイル一覧だけ' },
+      { number: '2', label: 'ディレクトリツリー風に折りたたむ' },
+      { number: '3', label: 'Git overlay と同じ行リストを差分内に再利用' }
+    ])
+  })
+
+  it('returns waiting with choices for Codex lettered option prompts', () => {
+    const content = [
+      '次の確認です。フェーズ1のルーム参加導線はどれにしますか？',
+      '',
+      '  - A 推奨: ルーム作成後に /rooms/$roomId のURL共有で参加',
+      '  - B 6桁程度のルームコード入力で参加',
+      '  - C 両方対応: URL共有とルームコード参加の両方',
+      '',
+      'おすすめは C です。'
+    ].join('\n')
+
+    const result = detectStatusCodex(content)
+
+    expect(result.status).toBe('waiting')
+    expect(result.choices).toEqual([
+      { number: 'A', label: '推奨: ルーム作成後に /rooms/$roomId のURL共有で参加' },
+      { number: 'B', label: '6桁程度のルームコード入力で参加' },
+      { number: 'C', label: '両方対応: URL共有とルームコード参加の両方' }
+    ])
+  })
+
+  it('does not treat ordinary Codex bullet lists as choices', () => {
+    const content = [
+      '実装内容です。',
+      '',
+      '  - 設定画面に Coming soon を表示',
+      '  - 問題管理を一覧閲覧のみに制限',
+      '',
+      'Enter to send'
+    ].join('\n')
+
+    const result = detectStatusCodex(content)
+
+    expect(result.status).toBe('idle')
+    expect(result.choices).toEqual([])
+  })
+
+  it('does not treat numbered verification steps as choices', () => {
+    const content = [
+      '最低限この順で確認すると効率がいいです。',
+      '',
+      '  1. .env に Firebase 設定を入れる',
+      '  2. aube seed で10件登録',
+      '  3. aube dev で / と /play を確認',
+      '  4. /results まで1周遊ぶ',
+      '  5. /rooms/new でルーム作成',
+      '  6. 別ブラウザまたはシークレットで /rooms/$roomId に参加',
+      '  7. ホスト開始、参加者回答、スコア更新、次問題、終了を確認',
+      '  8. /admin/questions で作成・編集・有効切替・削除を確認',
+      '  9. Vercel Preview で /rooms/$roomId 直アクセスを確認',
+      '',
+      '特に rooms 周りは、通常ブラウザ + シークレットで見るのが重要です。'
+    ].join('\n')
+
+    const result = detectStatusCodex(content)
+
+    expect(result.status).toBe('idle')
+    expect(result.choices).toEqual([])
+  })
+})
+
+describe('detectStatus', () => {
+  it('routes Codex variant commands to Codex detection', () => {
+    const content = [
+      'Would you like to run the following command?',
+      '',
+      '  1. Yes, proceed (y)',
+      "› 2. Yes, and don't ask again for commands that start with `tmux capture-pane` (p)",
+      '  3. No, and tell Codex what to do differently (esc)'
+    ].join('\n')
+
+    const result = detectStatus('unitmux', content, 'codex-aarch64-a')
+
+    expect(result.status).toBe('waiting')
+    expect(result.choices.map((choice) => choice.number)).toEqual(['1', '2', '3'])
   })
 })
 

@@ -1,7 +1,5 @@
 import type { DiffFile } from '../utils/parseDiff'
 
-export const COLLAPSE_THRESHOLD = 50
-
 export function DiffFileSection({
   file,
   open,
@@ -22,7 +20,11 @@ export function DiffFileSection({
       className={'diff-file-section' + (focused ? ' diff-file-focused' : '')}
       data-file-index={fileIndex}
     >
-      <button className="diff-file-header" onClick={onToggle}>
+      <button
+        className="diff-file-header"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onToggle}
+      >
         <span className="diff-file-chevron">{open ? '▼' : '▶'}</span>
         <span className="diff-file-path">{file.path}</span>
         <span className="diff-file-stats">

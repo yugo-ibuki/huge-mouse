@@ -22,6 +22,14 @@ export interface TmuxPane {
   activityLine: string
 }
 
+function isCodexCommand(command: string): boolean {
+  return /^codex(\b|-)/i.test(command)
+}
+
+function isClaudeCommand(command: string): boolean {
+  return /^claude(\b|-)/i.test(command)
+}
+
 // Strip ANSI escape sequences from captured pane content.
 // capture-pane -p normally strips them, but FLICK (alternate screen) mode
 // can leave CSI / OSC remnants in certain tmux versions.
@@ -479,10 +487,66 @@ function detectStatusClaude(
   return { status: 'idle', choices: [], prompt: '', activityLine: '' }
 }
 
-// Codex presents options as indented "- " list items
-const CODEX_OPTION_PATTERN = /^\s+-\s+\S/
 // "- ...?" is a definitive question/choice indicator
 const CODEX_QUESTION_PATTERN = /^\s+-\s+.+\?/
+// Codex may present explicit letter choices as bullets:
+//   - A Recommended option
+//   - B Alternative option
+const CODEX_LETTER_CHOICE_PATTERN = /^\s+-\s+([A-Z])(?:[.:)]|\s+)(.+)$/
+const CODEX_NUMBER_CHOICE_PATTERN = /^\s*([❯›>☞●]?)\s*(\d+)[.:)]\s+(.+)$/
+const CODEX_CHOICE_CONTEXT_EN_PATTERN = /would you like|which|choose|select/i
+const CODEX_CHOICE_CONTEXT_JA_PATTERN =
+  /どれ|どちら|選択|選ん|選び|おすすめ|推奨|進めてよければ|よければ実装/
+
+function hasCodexChoiceContext(content: string): boolean {
+  return (
+    CODEX_CHOICE_CONTEXT_EN_PATTERN.test(content) || CODEX_CHOICE_CONTEXT_JA_PATTERN.test(content)
+  )
+}
+
+function parseCodexExplicitChoices(content: string): TmuxChoice[] {
+  const lines = content.split('\n').slice(-50)
+  let choices: TmuxChoice[] = []
+  let expectedLetterCode = 'A'.charCodeAt(0)
+  let expectedNumber = 1
+  let hasSelectedMarker = false
+
+  for (const line of lines) {
+    const letterMatch = line.match(CODEX_LETTER_CHOICE_PATTERN)
+    const numberMatch = line.match(CODEX_NUMBER_CHOICE_PATTERN)
+    const match = letterMatch ?? numberMatch
+    if (!match) {
+      if (choices.length > 0 && (line.trim() === '' || /^\s+\S/.test(line))) continue
+      if (choices.length >= 2) break
+      choices = []
+      expectedLetterCode = 'A'.charCodeAt(0)
+      expectedNumber = 1
+      hasSelectedMarker = false
+      continue
+    }
+
+    const choiceKey = letterMatch ? match[1] : match[2]
+    const choiceLabel = letterMatch ? match[2] : match[3]
+    const expected = letterMatch ? String.fromCharCode(expectedLetterCode) : String(expectedNumber)
+    if (choiceKey !== expected) {
+      choices = []
+      expectedLetterCode = 'A'.charCodeAt(0)
+      expectedNumber = 1
+      hasSelectedMarker = false
+      const resetExpected = letterMatch ? 'A' : '1'
+      if (choiceKey !== resetExpected) continue
+    }
+
+    if (numberMatch && numberMatch[1]) hasSelectedMarker = true
+    choices.push({ number: choiceKey, label: choiceLabel.trim() })
+    if (letterMatch) expectedLetterCode += 1
+    else expectedNumber += 1
+  }
+
+  if (choices.length < 2) return []
+  if (hasSelectedMarker || hasCodexChoiceContext(content)) return choices
+  return []
+}
 
 function detectStatusCodex(content: string): {
   status: PaneStatus
@@ -499,12 +563,16 @@ function detectStatusCodex(content: string): {
     return { status: 'busy', choices: [], prompt: '', activityLine: parseActivityLine(content) }
   }
 
+  const choices = parseCodexExplicitChoices(content)
+  if (choices.length > 0) {
+    return { status: 'waiting', choices, prompt: '', activityLine: '' }
+  }
+
   // 2. Check for explicit idle signals (footer hints)
   const isIdle = CODEX_IDLE_INDICATORS.some((p) => p.test(tail))
   if (isIdle) {
     const hasQuestion = lines.some((line) => CODEX_QUESTION_PATTERN.test(line))
-    const optionCount = lines.filter((line) => CODEX_OPTION_PATTERN.test(line)).length
-    if (hasQuestion || optionCount >= 2) {
+    if (hasQuestion) {
       return { status: 'waiting', choices: [], prompt: '', activityLine: '' }
     }
     return { status: 'idle', choices: [], prompt: '', activityLine: '' }
@@ -521,7 +589,7 @@ function detectStatus(
   content: string,
   command: string
 ): { status: PaneStatus; choices: TmuxChoice[]; prompt: string; activityLine: string } {
-  if (command === 'codex') return detectStatusCodex(content)
+  if (isCodexCommand(command)) return detectStatusCodex(content)
   return detectStatusClaude(title, content)
 }
 
@@ -551,10 +619,14 @@ export async function listPanes(): Promise<TmuxPane[]> {
     // Also check pane_title as a fallback — when codex spawns subprocesses,
     // pane_current_command may change to `node` while the title still contains `codex`.
     .filter((pane) => {
-      if (/^(claude|codex|ai)(\b|-)/i.test(pane.command)) {
+      if (
+        isClaudeCommand(pane.command) ||
+        isCodexCommand(pane.command) ||
+        /^ai(\b|-)/i.test(pane.command)
+      ) {
         // Normalize variant names like `codex-aarch64-a` to `codex`
-        if (/^codex/i.test(pane.command)) pane.command = 'codex'
-        else if (/^claude/i.test(pane.command)) pane.command = 'claude'
+        if (isCodexCommand(pane.command)) pane.command = 'codex'
+        else if (isClaudeCommand(pane.command)) pane.command = 'claude'
         return true
       }
       // Claude Code sets distinctive title prefixes: ✳ (idle) or Braille
@@ -636,7 +708,7 @@ export async function sendInput(
       await new Promise((r) => setTimeout(r, 500))
     }
 
-    const isCodex = command === 'codex'
+    const isCodex = isCodexCommand(command)
     const hasNewlines = text.includes('\n')
 
     if (isCodex) {
@@ -926,7 +998,9 @@ export async function ensureShellPane(
 // Exported for testing only
 export const _testInternals = {
   parseChoices,
+  detectStatus,
   detectStatusClaude,
+  detectStatusCodex,
   trimCliFooter,
   stripAnsi
 }

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUiStore } from '../stores/uiStore'
+import { COLLAPSE_THRESHOLD, getDiffSidebarItems } from '../utils/diffSidebar'
 import { parseDiff } from '../utils/parseDiff'
-import { COLLAPSE_THRESHOLD, DiffFileSection } from './DiffFileSection'
+import { DiffFileSection } from './DiffFileSection'
 
 export function DiffOverlay(): React.JSX.Element | null {
   const diffContent = useUiStore((s) => s.diffContent)
@@ -9,6 +10,34 @@ export function DiffOverlay(): React.JSX.Element | null {
   const diffCwd = useUiStore((s) => s.diffCwd)
   const setDiffContent = useUiStore((s) => s.setDiffContent)
   const setDiffStaged = useUiStore((s) => s.setDiffStaged)
+
+  if (diffContent === null) return null
+
+  return (
+    <DiffOverlayContent
+      key={`${diffStaged}:${diffContent}`}
+      diffContent={diffContent}
+      diffStaged={diffStaged}
+      diffCwd={diffCwd}
+      setDiffContent={setDiffContent}
+      setDiffStaged={setDiffStaged}
+    />
+  )
+}
+
+function DiffOverlayContent({
+  diffContent,
+  diffStaged,
+  diffCwd,
+  setDiffContent,
+  setDiffStaged
+}: {
+  diffContent: string
+  diffStaged: boolean
+  diffCwd: string
+  setDiffContent: (value: string | null) => void
+  setDiffStaged: (value: boolean) => void
+}): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
 
   const [openFiles, setOpenFiles] = useState<Record<number, boolean>>({})
@@ -17,16 +46,14 @@ export function DiffOverlay(): React.JSX.Element | null {
   const hunkIndexRef = useRef(-1)
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const files =
-    diffContent && diffContent !== '(no changes)' ? parseDiff(diffContent) : []
+  const files = diffContent && diffContent !== '(no changes)' ? parseDiff(diffContent) : []
+  const sidebarItems = getDiffSidebarItems(files, openFiles)
 
-  // Reset state when diff content changes
   useEffect(() => {
-    setFocusedFile(-1)
-    hunkIndexRef.current = -1
-    setOpenFiles({})
-    setPendingKey(null)
-  }, [diffContent])
+    return () => {
+      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current)
+    }
+  }, [])
 
   const isFileOpen = (i: number): boolean =>
     openFiles[i] ?? files[i].additions + files[i].deletions < COLLAPSE_THRESHOLD
@@ -38,6 +65,11 @@ export function DiffOverlay(): React.JSX.Element | null {
   const scrollToFile = (index: number): void => {
     const el = contentRef.current?.querySelector(`[data-file-index="${index}"]`)
     el?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }
+
+  const focusFile = (index: number): void => {
+    setFocusedFile(index)
+    scrollToFile(index)
   }
 
   const jumpToHunk = (direction: 'next' | 'prev'): void => {
@@ -66,8 +98,6 @@ export function DiffOverlay(): React.JSX.Element | null {
     const result = await window.api.gitDiff(diffCwd, next)
     setDiffContent(result || '(no changes)')
   }
-
-  if (diffContent === null) return null
 
   return (
     <div
@@ -136,15 +166,13 @@ export function DiffOverlay(): React.JSX.Element | null {
           case 'n':
             if (files.length > 0) {
               const next = Math.min(focusedFile + 1, files.length - 1)
-              setFocusedFile(next)
-              scrollToFile(next)
+              focusFile(next)
             }
             break
           case 'N':
             if (files.length > 0) {
               const prev = Math.max(focusedFile - 1, 0)
-              setFocusedFile(prev)
-              scrollToFile(prev)
+              focusFile(prev)
             }
             break
           case 'Enter':
@@ -178,21 +206,46 @@ export function DiffOverlay(): React.JSX.Element | null {
             Esc
           </button>
         </div>
-        <div ref={contentRef} className="pane-popup-content diff-content">
-          {files.length === 0 ? (
-            <div className="diff-empty">(no changes)</div>
-          ) : (
-            files.map((file, i) => (
-              <DiffFileSection
-                key={i}
-                file={file}
-                open={isFileOpen(i)}
-                onToggle={() => toggleFile(i)}
-                focused={i === focusedFile}
-                fileIndex={i}
-              />
-            ))
-          )}
+        <div className="diff-layout">
+          <aside className="diff-sidebar" aria-label="Changed files">
+            {sidebarItems.length === 0 ? (
+              <div className="diff-sidebar-empty">No files</div>
+            ) : (
+              sidebarItems.map((item) => (
+                <button
+                  key={item.index}
+                  className={`diff-sidebar-row${item.index === focusedFile ? ' diff-sidebar-row-active' : ''}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => focusFile(item.index)}
+                >
+                  <span className="diff-sidebar-status">{item.open ? '▾' : '▸'}</span>
+                  <span className="diff-sidebar-path" title={item.path}>
+                    {item.path}
+                  </span>
+                  <span className="diff-sidebar-stats">
+                    {item.additions > 0 && <span className="diff-stat-add">+{item.additions}</span>}
+                    {item.deletions > 0 && <span className="diff-stat-del">-{item.deletions}</span>}
+                  </span>
+                </button>
+              ))
+            )}
+          </aside>
+          <div ref={contentRef} className="pane-popup-content diff-content">
+            {files.length === 0 ? (
+              <div className="diff-empty">(no changes)</div>
+            ) : (
+              files.map((file, i) => (
+                <DiffFileSection
+                  key={i}
+                  file={file}
+                  open={isFileOpen(i)}
+                  onToggle={() => toggleFile(i)}
+                  focused={i === focusedFile}
+                  fileIndex={i}
+                />
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
