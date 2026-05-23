@@ -1,7 +1,39 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUiStore } from '../stores/uiStore'
 import { useInputStore } from '../stores/inputStore'
+import { useTokenUsageStore } from '../stores/tokenUsageStore'
+import type { TokenUsage } from '../types'
+
+function formatCompactNumber(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
+  return String(value)
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) return '--'
+  return `${(value * 100).toFixed(1)}%`
+}
+
+function TokenUsageRows({ usage }: { usage: TokenUsage }): React.JSX.Element {
+  return (
+    <div className="token-usage-rows">
+      <span>Total</span>
+      <strong>{formatCompactNumber(usage.total)}</strong>
+      <span>Input</span>
+      <strong>{formatCompactNumber(usage.input)}</strong>
+      <span>Output</span>
+      <strong>{formatCompactNumber(usage.output)}</strong>
+      <span>Cached</span>
+      <strong>{formatCompactNumber(usage.cachedInput)}</strong>
+      <span>Reasoning</span>
+      <strong>{formatCompactNumber(usage.reasoningOutput)}</strong>
+      <span>Cache Hit</span>
+      <strong>{formatPercent(usage.cacheHitRate)}</strong>
+    </div>
+  )
+}
 
 export function Sidebar(): React.JSX.Element {
   const alwaysOnTop = useSettingsStore((s) => s.alwaysOnTop)
@@ -32,6 +64,8 @@ export function Sidebar(): React.JSX.Element {
   const setFocusKey = useSettingsStore((s) => s.setFocusKey)
 
   const sidebarOpen = useUiStore((s) => s.sidebarOpen)
+  const summary = useTokenUsageStore((s) => s.summary)
+  const summaryLoading = useTokenUsageStore((s) => s.summaryLoading)
 
   const [editingCompactKey, setEditingCompactKey] = useState(false)
   const [editingPreviewKey, setEditingPreviewKey] = useState(false)
@@ -44,6 +78,12 @@ export function Sidebar(): React.JSX.Element {
   const slashCommands = useInputStore((s) => s.slashCommands)
   const setSlashCommands = useInputStore((s) => s.setSlashCommands)
   const skillCommands = useInputStore((s) => s.skillCommands)
+
+  useEffect(() => {
+    if (sidebarOpen && !summary) {
+      useTokenUsageStore.getState().refreshSummary()
+    }
+  }, [sidebarOpen, summary])
 
   const toggleAlwaysOnTop = async (): Promise<void> => {
     const next = !alwaysOnTop
@@ -309,6 +349,34 @@ export function Sidebar(): React.JSX.Element {
           </button>
         )}
       </label>
+
+      <div className="sidebar-divider" />
+      <div className="token-usage-section">
+        <div className="token-usage-header">
+          <span className="setting-label">Token Usage</span>
+          <button
+            className="token-refresh-btn"
+            onClick={() => useTokenUsageStore.getState().refreshSummary(true)}
+            disabled={summaryLoading}
+          >
+            {summaryLoading ? '...' : 'Refresh'}
+          </button>
+        </div>
+        {summary ? (
+          <>
+            <span className="token-usage-subtitle">All</span>
+            <TokenUsageRows usage={summary.all} />
+            <span className="token-usage-subtitle">Claude</span>
+            <TokenUsageRows usage={summary.claude} />
+            <span className="token-usage-subtitle">Codex</span>
+            <TokenUsageRows usage={summary.codex} />
+          </>
+        ) : (
+          <span className="token-usage-empty">
+            {summaryLoading ? 'Loading tokens...' : 'No token data'}
+          </span>
+        )}
+      </div>
 
       <div className="sidebar-divider" />
       <div

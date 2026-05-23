@@ -29,6 +29,28 @@ export interface PaneDetail {
   sessionId: string
 }
 
+export interface TokenUsageSlice {
+  input: number
+  cachedInput: number
+  output: number
+  reasoningOutput: number
+  total: number
+  cacheHitRate: number | null
+}
+
+export interface TokenUsage extends TokenUsageSlice {
+  lastRequest?: TokenUsageSlice
+  updatedAt?: string
+  source: 'claude-jsonl' | 'codex-jsonl' | 'none'
+}
+
+export interface TokenUsageSummary {
+  all: TokenUsage
+  claude: TokenUsage
+  codex: TokenUsage
+  updatedAt?: string
+}
+
 export interface SendResult {
   success: boolean
   error?: string
@@ -36,22 +58,42 @@ export interface SendResult {
 
 const api = {
   listSessions: (): Promise<TmuxPane[]> => ipcRenderer.invoke('tmux:list-sessions'),
-  sendInput: (target: string, text: string, vimMode = false, images: string[] = []): Promise<SendResult> =>
+  sendInput: (
+    target: string,
+    text: string,
+    vimMode = false,
+    images: string[] = []
+  ): Promise<SendResult> =>
     ipcRenderer.invoke('tmux:send-input', { target, text, vimMode, images }),
   capturePane: (target: string): Promise<string> => ipcRenderer.invoke('tmux:capture-pane', target),
   getPaneDetail: (target: string): Promise<PaneDetail | null> =>
     ipcRenderer.invoke('tmux:pane-detail', target),
+  getTokenUsage: (target: string): Promise<TokenUsage> =>
+    ipcRenderer.invoke('tmux:get-token-usage', target),
+  getTokenUsageSummary: (force = false): Promise<TokenUsageSummary> =>
+    ipcRenderer.invoke('tmux:get-token-usage-summary', force),
   listSkills: (cwd: string): Promise<{ user: SkillEntry[]; project: SkillEntry[] }> =>
     ipcRenderer.invoke('skills:list', cwd),
   listTmuxSessions: (): Promise<string[]> => ipcRenderer.invoke('tmux:list-tmux-sessions'),
-  createSession: (sessionName: string, command: 'claude' | 'codex', cwd?: string): Promise<SendResult> =>
+  createSession: (
+    sessionName: string,
+    command: 'claude' | 'codex',
+    cwd?: string
+  ): Promise<SendResult> =>
     ipcRenderer.invoke('tmux:create-session', { sessionName, command, cwd }),
-  createNewSession: (sessionName: string, command: 'claude' | 'codex', cwd?: string): Promise<SendResult> =>
+  createNewSession: (
+    sessionName: string,
+    command: 'claude' | 'codex',
+    cwd?: string
+  ): Promise<SendResult> =>
     ipcRenderer.invoke('tmux:create-new-session', { sessionName, command, cwd }),
   killPane: (target: string): Promise<SendResult> => ipcRenderer.invoke('tmux:kill-pane', target),
   findShellPane: (session: string): Promise<string | null> =>
     ipcRenderer.invoke('tmux:find-shell-pane', session),
-  ensureShellPane: (session: string, cwd: string): Promise<{ success: boolean; target?: string; error?: string }> =>
+  ensureShellPane: (
+    session: string,
+    cwd: string
+  ): Promise<{ success: boolean; target?: string; error?: string }> =>
     ipcRenderer.invoke('tmux:ensure-shell-pane', { session, cwd }),
   gitAdd: (cwd: string): Promise<SendResult> => ipcRenderer.invoke('git:add', cwd),
   gitAddFiles: (cwd: string, files: string[]): Promise<SendResult> =>

@@ -4,6 +4,7 @@ import './App.css'
 import { usePaneStore } from './stores/paneStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useUiStore } from './stores/uiStore'
+import { useTokenUsageStore } from './stores/tokenUsageStore'
 
 import { PaneHeader } from './components/PaneHeader'
 import { InputArea } from './components/InputArea'
@@ -102,6 +103,7 @@ function App(): React.JSX.Element {
                           const vm = useSettingsStore.getState().vimMode
                           await window.api.sendInput(sel, c.number, vm)
                           useUiStore.getState().flashStatus(`Sent ${c.number} → ${sel}`, true)
+                          setTimeout(() => useTokenUsageStore.getState().refreshPane(sel), 2500)
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Tab' && !e.shiftKey) {

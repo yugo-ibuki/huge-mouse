@@ -3,6 +3,14 @@ import { existsSync } from 'fs'
 import { readFile, readdir } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
+import {
+  findCodexSessionJsonl,
+  getTokenUsageForClaudeJsonl,
+  getTokenUsageForCodexJsonl,
+  getTokenUsageSummary,
+  type TokenUsage,
+  type TokenUsageSummary
+} from './tokenUsage'
 
 export type PaneStatus = 'idle' | 'busy' | 'waiting'
 
@@ -120,7 +128,12 @@ async function findSessionJsonl(target: string): Promise<string | null> {
         try {
           const data = JSON.parse(await readFile(join(sessionsDir, file), 'utf-8'))
           if (data.cwd === cwd) {
-            const jsonlPath = join(claudeDir, 'projects', encodeCwd(data.cwd), `${data.sessionId}.jsonl`)
+            const jsonlPath = join(
+              claudeDir,
+              'projects',
+              encodeCwd(data.cwd),
+              `${data.sessionId}.jsonl`
+            )
             if (existsSync(jsonlPath) && (!best || data.startedAt > best.startedAt)) {
               best = { path: jsonlPath, startedAt: data.startedAt }
             }
@@ -307,9 +320,7 @@ const SURVEY_LABEL_SET = new Set(['bad', 'fine', 'good', 'great', 'dismiss', 'sk
 
 // Check if choices are all feedback/rating labels (survey, not actionable)
 function isSurveyChoices(choices: TmuxChoice[]): boolean {
-  return (
-    choices.length > 0 && choices.every((c) => SURVEY_LABEL_SET.has(c.label.toLowerCase()))
-  )
+  return choices.length > 0 && choices.every((c) => SURVEY_LABEL_SET.has(c.label.toLowerCase()))
 }
 
 // Check if surrounding lines contain "(optional)" marker
@@ -821,6 +832,81 @@ export async function getPaneDetail(target: string): Promise<PaneDetail | null> 
   }
 }
 
+function isCodexPane(command: string, title: string): boolean {
+  return isCodexCommand(command) || /\bcodex\b/i.test(title)
+}
+
+export async function getPaneTokenUsage(target: string): Promise<TokenUsage> {
+  if (!TARGET_PATTERN.test(target)) {
+    return {
+      input: 0,
+      cachedInput: 0,
+      output: 0,
+      reasoningOutput: 0,
+      total: 0,
+      cacheHitRate: null,
+      source: 'none'
+    }
+  }
+
+  try {
+    const [meta, content] = await Promise.all([
+      run([
+        'display-message',
+        '-t',
+        target,
+        '-p',
+        '#{pane_current_command}|#{pane_title}|#{pane_current_path}'
+      ]),
+      capturePaneContent(target)
+    ])
+    const [command, title, cwd] = meta.trim().split('|')
+
+    if (isCodexPane(command, title)) {
+      const sessionId = parseSessionId(content)
+      const filePath = await findCodexSessionJsonl(sessionId, cwd)
+      return filePath
+        ? getTokenUsageForCodexJsonl(filePath)
+        : {
+            input: 0,
+            cachedInput: 0,
+            output: 0,
+            reasoningOutput: 0,
+            total: 0,
+            cacheHitRate: null,
+            source: 'none'
+          }
+    }
+
+    const filePath = await findSessionJsonl(target)
+    return filePath
+      ? getTokenUsageForClaudeJsonl(filePath)
+      : {
+          input: 0,
+          cachedInput: 0,
+          output: 0,
+          reasoningOutput: 0,
+          total: 0,
+          cacheHitRate: null,
+          source: 'none'
+        }
+  } catch {
+    return {
+      input: 0,
+      cachedInput: 0,
+      output: 0,
+      reasoningOutput: 0,
+      total: 0,
+      cacheHitRate: null,
+      source: 'none'
+    }
+  }
+}
+
+export function getGlobalTokenUsageSummary(force = false): Promise<TokenUsageSummary> {
+  return getTokenUsageSummary(force)
+}
+
 export async function gitAdd(cwd: string): Promise<{ success: boolean; error?: string }> {
   try {
     await runGit(['-C', cwd, 'add', '-A'])
@@ -999,7 +1085,11 @@ export async function ensureShellPane(
     if (existing) return { success: true, target: existing }
 
     const currentWindow = await run([
-      'display-message', '-t', session, '-p', '#{window_index}'
+      'display-message',
+      '-t',
+      session,
+      '-p',
+      '#{window_index}'
     ]).then((s) => s.trim())
 
     const args = ['new-window', '-t', session, '-n', 'unitmux-shell']

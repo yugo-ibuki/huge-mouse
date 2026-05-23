@@ -37,6 +37,28 @@ interface PaneDetail {
   sessionId: string
 }
 
+interface TokenUsageSlice {
+  input: number
+  cachedInput: number
+  output: number
+  reasoningOutput: number
+  total: number
+  cacheHitRate: number | null
+}
+
+interface TokenUsage extends TokenUsageSlice {
+  lastRequest?: TokenUsageSlice
+  updatedAt?: string
+  source: 'claude-jsonl' | 'codex-jsonl' | 'none'
+}
+
+interface TokenUsageSummary {
+  all: TokenUsage
+  claude: TokenUsage
+  codex: TokenUsage
+  updatedAt?: string
+}
+
 interface SendResult {
   success: boolean
   error?: string
@@ -46,14 +68,32 @@ interface TmuxAPI {
   listSessions: () => Promise<TmuxPane[]>
   listSkills: (cwd: string) => Promise<{ user: SkillEntry[]; project: SkillEntry[] }>
   listTmuxSessions: () => Promise<string[]>
-  createSession: (sessionName: string, command: 'claude' | 'codex', cwd?: string) => Promise<SendResult>
-  createNewSession: (sessionName: string, command: 'claude' | 'codex', cwd?: string) => Promise<SendResult>
+  createSession: (
+    sessionName: string,
+    command: 'claude' | 'codex',
+    cwd?: string
+  ) => Promise<SendResult>
+  createNewSession: (
+    sessionName: string,
+    command: 'claude' | 'codex',
+    cwd?: string
+  ) => Promise<SendResult>
   killPane: (target: string) => Promise<SendResult>
   findShellPane: (session: string) => Promise<string | null>
-  ensureShellPane: (session: string, cwd: string) => Promise<{ success: boolean; target?: string; error?: string }>
-  sendInput: (target: string, text: string, vimMode?: boolean, images?: string[]) => Promise<SendResult>
+  ensureShellPane: (
+    session: string,
+    cwd: string
+  ) => Promise<{ success: boolean; target?: string; error?: string }>
+  sendInput: (
+    target: string,
+    text: string,
+    vimMode?: boolean,
+    images?: string[]
+  ) => Promise<SendResult>
   capturePane: (target: string) => Promise<string>
   getPaneDetail: (target: string) => Promise<PaneDetail | null>
+  getTokenUsage: (target: string) => Promise<TokenUsage>
+  getTokenUsageSummary: (force?: boolean) => Promise<TokenUsageSummary>
   gitAdd: (cwd: string) => Promise<SendResult>
   gitAddFiles: (cwd: string, files: string[]) => Promise<SendResult>
   gitCommit: (cwd: string, message: string) => Promise<SendResult>

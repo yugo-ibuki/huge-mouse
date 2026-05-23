@@ -19,7 +19,9 @@ import {
   findShellPane,
   ensureShellPane,
   gitDiff,
-  getConversationText
+  getConversationText,
+  getPaneTokenUsage,
+  getGlobalTokenUsageSummary
 } from './tmux'
 
 interface SkillEntry {
@@ -224,7 +226,9 @@ app.whenReady().then(() => {
     try {
       const result = await dialog.showOpenDialog(win, {
         properties: ['openFile', 'multiSelections'],
-        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'] }]
+        filters: [
+          { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'] }
+        ]
       })
       return result.canceled ? [] : result.filePaths
     } finally {
@@ -233,10 +237,7 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('tmux:capture-pane', async (_event, target: string) => {
-    const [history, capture] = await Promise.all([
-      getConversationText(target),
-      capturePane(target)
-    ])
+    const [history, capture] = await Promise.all([getConversationText(target), capturePane(target)])
     return combineHistoryAndCapture(history, capture)
   })
 
@@ -254,6 +255,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tmux:pane-detail', async (_event, target: string) => {
     return getPaneDetail(target)
+  })
+
+  ipcMain.handle('tmux:get-token-usage', async (_event, target: string) => {
+    return getPaneTokenUsage(target)
+  })
+
+  ipcMain.handle('tmux:get-token-usage-summary', async (_event, force?: boolean) => {
+    return getGlobalTokenUsageSummary(Boolean(force))
   })
 
   ipcMain.handle('tmux:list-tmux-sessions', async () => {

@@ -5,6 +5,18 @@ import { useInputStore } from '../stores/inputStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { usePaneStore } from '../stores/paneStore'
 import { useUiStore } from '../stores/uiStore'
+import { useTokenUsageStore } from '../stores/tokenUsageStore'
+
+function formatCompactNumber(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
+  return String(value)
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) return '--'
+  return `${Math.round(value * 100)}%`
+}
 
 function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
   const status = useUiStore((s) => s.status)
@@ -12,8 +24,12 @@ function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
   const hasImages = useInputStore((s) => s.images.length > 0)
   const hasSelected = usePaneStore((s) => s.selected !== '')
   const selectedPane = usePaneStore((s) => s.panes.find((p) => p.target === s.selected))
+  const selected = usePaneStore((s) => s.selected)
+  const usage = useTokenUsageStore((s) => (selected ? s.paneUsage[selected] : undefined))
+  const loading = useTokenUsageStore((s) => (selected ? s.paneLoading[selected] : false))
   const isBusy = selectedPane?.status === 'busy'
   const activityLine = selectedPane?.activityLine ?? ''
+  const showUsage = usage && usage.source !== 'none'
 
   const handleAttach = async (): Promise<void> => {
     const paths = await window.api.selectImages()
@@ -22,15 +38,31 @@ function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
 
   return (
     <div className="footer">
-      {isBusy && (
-        <span className="busy-indicator">
-          <span className="busy-spinner" />
-          <span className="busy-text">{activityLine || 'Working...'}</span>
-        </span>
-      )}
-      {!isBusy && status && (
-        <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>
-      )}
+      <span className="token-footer">
+        {showUsage ? (
+          <>
+            <span>{formatCompactNumber(usage.total)}</span>
+            <span>In {formatCompactNumber(usage.input)}</span>
+            <span>Out {formatCompactNumber(usage.output)}</span>
+            <span>Cache {formatPercent(usage.cacheHitRate)}</span>
+          </>
+        ) : loading ? (
+          'Tokens ...'
+        ) : (
+          ''
+        )}
+      </span>
+      <span className="footer-status">
+        {isBusy && (
+          <span className="busy-indicator">
+            <span className="busy-spinner" />
+            <span className="busy-text">{activityLine || 'Working...'}</span>
+          </span>
+        )}
+        {!isBusy && status && (
+          <span className={status.ok ? 'status-ok' : 'status-err'}>{status.message}</span>
+        )}
+      </span>
       <button className="attach-btn" onClick={handleAttach} title="Attach images (or drag & drop)">
         +
       </button>
@@ -42,7 +74,15 @@ function StatusFooter({ send }: { send: () => void }): React.JSX.Element {
         {isBusy ? (
           '...'
         ) : (
-          <svg className="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            className="send-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <line x1="22" y1="2" x2="11" y2="13" />
             <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
@@ -124,13 +164,15 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
       const currentVimMode = useSettingsStore.getState().vimMode
       const result = await window.api.sendInput(currentSelected, finalText, currentVimMode, images)
       if (result.success) {
-        const historyText = images.length > 0 ? `${finalText} [+${images.length} images]` : finalText
+        const historyText =
+          images.length > 0 ? `${finalText} [+${images.length} images]` : finalText
         useInputStore.getState().pushHistory(historyText)
         useInputStore.getState().setText('')
         useInputStore.getState().clearImages()
         const firstLine = finalText.split('\n')[0].slice(0, 60)
         usePaneStore.getState().updateLastPrompt(currentSelected, firstLine)
         useUiStore.getState().flashStatus('Sent!', true)
+        setTimeout(() => useTokenUsageStore.getState().refreshPane(currentSelected), 2500)
       } else {
         useUiStore.getState().flashStatus(result.error ?? 'Failed', false)
       }

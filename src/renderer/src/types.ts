@@ -30,6 +30,28 @@ export interface PaneDetail {
   sessionId: string
 }
 
+export interface TokenUsageSlice {
+  input: number
+  cachedInput: number
+  output: number
+  reasoningOutput: number
+  total: number
+  cacheHitRate: number | null
+}
+
+export interface TokenUsage extends TokenUsageSlice {
+  lastRequest?: TokenUsageSlice
+  updatedAt?: string
+  source: 'claude-jsonl' | 'codex-jsonl' | 'none'
+}
+
+export interface TokenUsageSummary {
+  all: TokenUsage
+  claude: TokenUsage
+  codex: TokenUsage
+  updatedAt?: string
+}
+
 export interface TmuxPane {
   target: string
   pid: string
@@ -40,4 +62,3 @@ export interface TmuxPane {
   prompt: string
   activityLine: string
 }
-

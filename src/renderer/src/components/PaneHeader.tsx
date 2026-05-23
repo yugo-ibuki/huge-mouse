@@ -3,6 +3,7 @@ import type { TmuxPane } from '../types'
 import { usePaneStore } from '../stores/paneStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUiStore } from '../stores/uiStore'
+import { useTokenUsageStore } from '../stores/tokenUsageStore'
 
 export const PaneHeader = memo(function PaneHeader(): React.JSX.Element {
   const panes = usePaneStore((s) => s.panes)
@@ -90,6 +91,10 @@ export const PaneHeader = memo(function PaneHeader(): React.JSX.Element {
                         onClick={async () => {
                           await window.api.sendInput(p.target, c.number, vimMode)
                           useUiStore.getState().flashStatus(`Sent ${c.number} → ${p.target}`, true)
+                          setTimeout(
+                            () => useTokenUsageStore.getState().refreshPane(p.target),
+                            2500
+                          )
                         }}
                       >
                         {c.number}

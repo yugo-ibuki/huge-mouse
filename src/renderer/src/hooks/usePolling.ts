@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { SkillCommand } from '../types'
 import { usePaneStore } from '../stores/paneStore'
 import { useInputStore } from '../stores/inputStore'
+import { useTokenUsageStore } from '../stores/tokenUsageStore'
 
 const USER_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const PROJECT_CACHE_TTL = 30 * 1000 // 30 seconds
@@ -21,6 +22,7 @@ export function usePolling(): void {
 
       if (result.length > 0 && !selected) {
         setSelected(result[0].target)
+        useTokenUsageStore.getState().refreshPane(result[0].target)
       }
 
       const activeTargets = result.map((p) => p.target)
@@ -111,6 +113,7 @@ export function usePolling(): void {
     // Run once for the current selected pane
     const { selected } = usePaneStore.getState()
     handleSelectedChange(selected)
+    if (selected) useTokenUsageStore.getState().refreshPane(selected)
 
     // Subscribe to selected pane changes
     let prevSelected = usePaneStore.getState().selected
@@ -118,6 +121,7 @@ export function usePolling(): void {
       if (state.selected !== prevSelected) {
         prevSelected = state.selected
         handleSelectedChange(state.selected)
+        useTokenUsageStore.getState().refreshPane(state.selected)
       }
     })
 

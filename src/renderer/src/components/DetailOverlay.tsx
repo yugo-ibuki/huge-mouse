@@ -1,10 +1,21 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useUiStore } from '../stores/uiStore'
+import { useTokenUsageStore } from '../stores/tokenUsageStore'
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('en-US').format(value)
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) return '--'
+  return `${(value * 100).toFixed(1)}%`
+}
 
 export function DetailOverlay(): React.JSX.Element | null {
   const paneDetail = useUiStore((s) => s.paneDetail)
   const setPaneDetail = useUiStore((s) => s.setPaneDetail)
   const setConfirmKill = useUiStore((s) => s.setConfirmKill)
+  const usage = useTokenUsageStore((s) => (paneDetail ? s.paneUsage[paneDetail.target] : undefined))
 
   const detailContentRef = useRef<HTMLDivElement>(null)
 
@@ -14,6 +25,10 @@ export function DetailOverlay(): React.JSX.Element | null {
       document.querySelector<HTMLTextAreaElement>('.textarea')?.focus()
     })
   }
+
+  useEffect(() => {
+    if (paneDetail) useTokenUsageStore.getState().refreshPane(paneDetail.target)
+  }, [paneDetail])
 
   if (paneDetail === null) return null
 
@@ -86,6 +101,30 @@ export function DetailOverlay(): React.JSX.Element | null {
             <>
               <span className="detail-label">Session</span>
               <span className="detail-value detail-session">{paneDetail.sessionId}</span>
+            </>
+          )}
+          {usage && usage.source !== 'none' && (
+            <>
+              <span className="detail-label">Tokens</span>
+              <span className="detail-value">{formatNumber(usage.total)}</span>
+              <span className="detail-label">Input</span>
+              <span className="detail-value">{formatNumber(usage.input)}</span>
+              <span className="detail-label">Cached Input</span>
+              <span className="detail-value">{formatNumber(usage.cachedInput)}</span>
+              <span className="detail-label">Output</span>
+              <span className="detail-value">{formatNumber(usage.output)}</span>
+              <span className="detail-label">Reasoning</span>
+              <span className="detail-value">{formatNumber(usage.reasoningOutput)}</span>
+              {usage.lastRequest && (
+                <>
+                  <span className="detail-label">Last Request</span>
+                  <span className="detail-value">{formatNumber(usage.lastRequest.total)}</span>
+                </>
+              )}
+              <span className="detail-label">Cache Hit</span>
+              <span className="detail-value">{formatPercent(usage.cacheHitRate)}</span>
+              <span className="detail-label">Token Source</span>
+              <span className="detail-value">{usage.source}</span>
             </>
           )}
           <span className="detail-label">PID</span>
