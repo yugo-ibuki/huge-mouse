@@ -2,7 +2,7 @@
 
 ## Overview
 
-Send images to Claude CLI directly from unitmux.
+Send images to the selected AI pane directly from unitmux.
 
 ## Attaching Images
 
@@ -18,8 +18,7 @@ Attached images appear as thumbnails above the input area. Hover to reveal the r
 
 ## Sending
 
-Images are sent separately from your text message.
+Images are pasted into the pane before your text message so the CLI can detect the file paths.
 
 - With text: images are sent first, then the text message
 - Without text: images alone can be sent by pressing Send
-

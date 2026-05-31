@@ -17,9 +17,9 @@ Press `Ctrl+B` to toggle shell mode on/off. When active, the input placeholder c
 
 ## Keyboard Shortcut
 
-| Shortcut | Action |
-| -------- | ------ |
-| `Ctrl+B` | Toggle shell mode (key configurable in Settings) |
+| Shortcut | Action            |
+| -------- | ----------------- |
+| `Ctrl+B` | Toggle shell mode |
 
 ## Preview in Shell Mode
 

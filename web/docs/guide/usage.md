@@ -7,8 +7,8 @@ Each pane tag shows a colored dot indicating its current state:
 | Indicator | Meaning                                           |
 | --------- | ------------------------------------------------- |
 | 🟢 Green  | Ready for input                                   |
-| 🟡 Yellow | Waiting for your response — choice buttons appear |
-| ⚫ Gray   | Busy, processing                                  |
+| 🟠 Orange | Busy, processing                                  |
+| ⚫ Gray   | Waiting for your response — choice buttons appear |
 
 ## Session Grouping
 
@@ -42,7 +42,14 @@ Press `Ctrl+D` to view details of the selected pane:
 
 - Target, command, PID
 - Model and session ID (if detected)
+- Token usage breakdown when local Claude Code or Codex logs are available
 - CWD, git branch, and git status
+
+## Token Usage
+
+The lower-left footer shows token usage for the selected pane: total, input, output, and cache hit rate. Values refresh when you switch panes, open session detail, or send a prompt.
+
+Open Settings to see the aggregate Token Usage panel across local Claude Code and Codex logs. It includes total, input, output, cached input, reasoning tokens, and cache hit rate for All, Claude, and Codex.
 
 ## Input History
 
@@ -50,16 +57,22 @@ Use `↑` / `↓` arrow keys in the textarea to navigate through previously sent
 
 ## Compact Mode
 
-Press `Ctrl+M` to toggle compact mode, which hides the input area and shows only the pane tags. The key is configurable in Settings.
+Press `Ctrl+W` to toggle compact mode, which hides the input area and shows only the pane tags. The key is configurable in Settings.
 
 ## New Session
 
-Press `Ctrl+N` to open the new session dialog.
+Press `Ctrl+N` to quickly add a new `claude` window to the current tmux session, using the selected pane's working directory when available.
+
+Press `Ctrl+Shift+N` to open the new session dialog.
 
 - **New Session** tab: enter a name to create a brand new tmux session with `claude` or `codex`
 - **Add to Existing** tab: select an existing tmux session to add a new window
 
 Use `Tab` to switch between modes, `h`/`l` to toggle `claude`/`codex`.
+
+## Git Diff Viewer
+
+Press `Ctrl+F` to open a structured diff viewer for the selected pane's working directory. Use `s` to switch between unstaged and staged diffs, `n`/`N` to jump between files, `]c`/`[c` to jump between hunks, and `o` or `Enter` to collapse or expand the focused file or directory.
 
 ## Global Focus
 
@@ -91,5 +104,5 @@ Press `Ctrl+B` to toggle shell mode.
 Type `/` in the input to filter available commands.
 
 - Custom slash commands can be defined
-- Skill files from `~/.claude/skills/` are automatically loaded
+- Skill files from `~/.claude/skills/` and the selected pane's project `.claude/skills/` are automatically loaded
 - Navigate the autocomplete with arrow keys, select with `Enter` or `Tab`
