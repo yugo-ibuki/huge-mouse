@@ -60,7 +60,7 @@ function App(): React.JSX.Element {
     return () => window.removeEventListener('focus', focusTextarea)
   }, [paneContent, paneDetail, gitPopup])
 
-  // IPC listeners
+  // Desktop bridge listeners
   useEffect(() => {
     return window.api.onCompactChanged((value) => {
       useUiStore.getState().setCompact(value)

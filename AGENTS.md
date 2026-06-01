@@ -4,10 +4,10 @@ This file provides guidance to OpenAI Codex CLI when working with code in this r
 
 ## Project Overview
 
-unitmux is a floating Electron desktop app that sends input to tmux sessions running `claude` or `codex` commands. It provides a lightweight UI for selecting and sending commands to active tmux panes.
+unitmux is a floating Tauri desktop app that sends input to tmux sessions running `claude` or `codex` commands. It provides a lightweight UI for selecting and sending commands to active tmux panes.
 
-- Electron 39 + React 19 + TypeScript 5.9
-- Build tooling: electron-vite + electron-builder
+- Tauri 2 + Rust + React 19 + TypeScript 5.9
+- Build tooling: Cargo + Vite
 - Documentation site: VitePress (`web/docs/`)
 
 ## Commands
@@ -21,23 +21,23 @@ npm run build:linux      # Build for Linux
 npm run build:unpack     # Build unpacked (for testing)
 npm run lint             # ESLint
 npm run format           # Prettier formatting
-npm run typecheck        # TypeScript check (both node + web)
-npm run typecheck:node   # TypeScript check for main/preload only
+npm run typecheck        # TypeScript check for renderer
 npm run typecheck:web    # TypeScript check for renderer only
 ```
 
 ## Architecture
 
-Three-process Electron architecture with context isolation:
+Tauri architecture with Rust commands and a React renderer:
 
 ```
-src/main/          → Electron main process (Node.js)
-  index.ts         → Window creation (700×400, always-on-top), IPC handler registration, custom protocol (local-image://)
-  tmux.ts          → tmux interaction: listPanes(), sendInput() with target validation, git operations, JSONL conversation log
+crates/unitmux-core/ → Rust core logic
+  tmux.rs            → tmux interaction, git operations, pane parsing, JSONL conversation log
+  token_usage.rs     → Claude/Codex JSONL token usage parsing
+  skills.rs          → .claude/skills discovery
 
-src/preload/       → Context bridge (secure IPC between main ↔ renderer)
-  index.ts         → Exposes window.api (TmuxAPI) via contextBridge
-  index.d.ts       → Type definitions for Window.api (TmuxAPI) and Window.electron (ElectronAPI)
+src-tauri/        → Tauri desktop shell
+  src/main.rs     → Window bootstrap and local-image:// protocol
+  src/commands.rs → Tauri command registration for tmux, git, window controls, streaming, images
 
 src/renderer/src/  → React UI (browser environment)
   main.tsx         → React bootstrap
@@ -48,21 +48,20 @@ src/renderer/src/  → React UI (browser environment)
   assets/          → CSS, SVG
 ```
 
-### IPC Channels
+### Tauri Commands
 
-- `tmux:list-sessions` → Returns `TmuxPane[]` filtered to panes running `claude` or `codex` only
-- `tmux:send-input` → Sends text + images to a tmux pane by target, returns `SendResult`
-- `tmux:ensure-shell-pane` → Creates/finds a `unitmux-shell` window in a session, returns target
-- `tmux:create-session` → Adds a new window to an existing tmux session
-- `tmux:create-new-session` → Creates a new tmux session with a given name
-- `dialog:open-image` → Opens file picker for images (temporarily disables alwaysOnTop)
-- `git:add` / `git:add-files` / `git:commit` / `git:push` / `git:diff` → Git operations
-- `image-dropped` → Main→renderer notification when images are dropped via drag & drop
+- `list_sessions` → Returns `TmuxPane[]` filtered to panes running `claude` or `codex` only
+- `send_input` → Sends text + images to a tmux pane by target, returns `SendResult`
+- `ensure_shell_pane` → Creates/finds a `unitmux-shell` window in a session, returns target
+- `create_session` / `create_new_session` → Adds tmux windows or sessions
+- `select_images` → Opens the native image picker
+- `git_add` / `git_add_files` / `git_commit` / `git_push` / `git_diff` → Git operations
+- `start_stream` / `stop_stream` → Streams tmux preview content to the renderer
 
 ### Key Types
 
 - `TmuxPane { target, pid, command, title, status, choices, prompt, activityLine }` — pane info with activity state
-- `SendResult { success, error? }` — defined in preload/index.ts
+- `SendResult { success, error? }` — shared between Rust commands and renderer declarations
 
 ### Shell Pane Feature
 
@@ -78,7 +77,7 @@ src/renderer/src/  → React UI (browser environment)
 
 - Images attached via "+" button (file dialog) or drag & drop onto the window
 - Thumbnails displayed via `local-image://` custom protocol (bypasses file:// security restrictions)
-- Drag & drop handled in preload using `webUtils.getPathForFile()` (Electron 28+ with contextIsolation)
+- Drag & drop handled via Tauri window drag-drop events
 - Images sent to Codex CLI as bracketed paste (`\x1b[200~`...`\x1b[201~`) so the CLI detects them as image file paths
 
 ### Git Operations
@@ -96,11 +95,9 @@ src/renderer/src/  → React UI (browser environment)
 
 ### TypeScript Configuration
 
-Three separate tsconfigs via composite project references:
+TypeScript renderer config:
 
-- `tsconfig.node.json` — main + preload (Node environment)
 - `tsconfig.web.json` — renderer (DOM + React, `@renderer` path alias → `src/renderer/src`)
-- `tsconfig.json` — root that references both
 
 ## Code Style
 

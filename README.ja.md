@@ -4,18 +4,21 @@
 
 [English](README.md)
 
+移行状況: [RUST_MIGRATION_STATUS.md](RUST_MIGRATION_STATUS.md)
+
 ## どんなアプリ？
 
 unitmux は常に最前面に表示される小さなウィンドウで、tmux 内で動作中の AI コーディングアシスタント（`claude`、`codex`）すべてに接続します。コマンド送信、ステータス確認、選択肢の応答 — すべてを一箇所から、ターミナルを切り替えずに。
 
 ## 必要なもの
 
-- macOS
+- macOS または Linux
 - [tmux](https://github.com/tmux/tmux) で `claude` または `codex` が動作していること
+- Linux のみ: 画像ピッカーボタンには `zenity` が必要
 
 ## インストール
 
-### Homebrew（推奨）
+### macOS Homebrew
 
 ```bash
 brew install --cask yugo-ibuki/tap/unitmux
@@ -23,7 +26,8 @@ brew install --cask yugo-ibuki/tap/unitmux
 
 ### 手動インストール
 
-[Releases](https://github.com/yugo-ibuki/unitmux/releases) ページから最新のDMGをダウンロードし、アプリを `/Applications` にドラッグしてください。
+- macOS: [Releases](https://github.com/yugo-ibuki/unitmux/releases) ページから `unitmux-macos.dmg` をダウンロードし、アプリを `/Applications` にドラッグしてください。
+- Linux: [Releases](https://github.com/yugo-ibuki/unitmux/releases) ページから `unitmux-linux` バイナリをダウンロードし、実行権限を付けて `PATH` 上に配置してください。
 
 ### macOS Gatekeeper の警告
 
@@ -74,7 +78,6 @@ brew install --cask yugo-ibuki/tap/unitmux
 | `Ctrl+C`                    | セッションを終了（詳細パネル表示中、確認ダイアログあり）                          |
 | `Ctrl+G`                    | git操作ポップアップを表示（キーは設定で変更可能）                                 |
 | `Ctrl+F`                    | git diffビューアーを表示（キーは設定で変更可能）                                  |
-| `Ctrl+S`                    | セッションの実行を停止 — Escapeを送信して中断（キーは設定で変更可能）             |
 | `Ctrl+W`                    | コンパクトモード切り替え — タブバーだけの細い表示に（キーは設定で変更可能）       |
 | `Ctrl+N`                    | 新しいセッションを作成（tmuxセッションとコマンドを選択）                          |
 | `/`                         | スラッシュコマンドの補完を表示（入力先頭で）                                      |
@@ -114,7 +117,6 @@ brew install --cask yugo-ibuki/tap/unitmux
 - **Choice Key** — 選択肢ショートカットの修飾キーを変更（`Ctrl` または `Cmd`）
 - **Send Key** — 送信キーを `Cmd+Enter` または `Enter` に変更（もう一方が改行になる）
 - **Vim Mode** — Claude CLIのvimエディタモード用にEscape+iのインサートモード切り替えを有効化
-- **Stop Key** — セッション停止のキーを変更（`Ctrl+<キー>`）
 - **Compact Key** — コンパクトモードのキーを変更（`Ctrl+<キー>`）
 - **Preview Key** — プレビュー表示のキーを変更（`Ctrl+<キー>`）
 - **Detail Key** — セッション詳細のキーを変更（`Ctrl+<キー>`）

@@ -15,12 +15,16 @@ export default defineConfig({
     ]
   ],
   themeConfig: {
-    nav: [{ text: 'Guide', link: '/guide/getting-started' }],
+    nav: [
+      { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Migration', link: '/guide/migration-status' }
+    ],
     sidebar: [
       {
         text: 'Guide',
         items: [
           { text: 'Getting Started', link: '/guide/getting-started' },
+          { text: 'Migration Status', link: '/guide/migration-status' },
           { text: 'Usage', link: '/guide/usage' },
           { text: 'Image Attachment', link: '/guide/images' },
           { text: 'Shell Mode', link: '/guide/shell' },

@@ -46,6 +46,7 @@ export function HelpOverlay(): React.JSX.Element | null {
         [`Ctrl+${diffKey.toUpperCase()}`, 'Git diff viewer'],
         ['Ctrl+N', 'New session'],
         ['Ctrl+Shift+N', 'New session (select session)'],
+        ['Ctrl+C', 'Confirm close pane from detail'],
         ['Ctrl+,', 'This help']
       ]
     },

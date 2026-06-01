@@ -1,13 +1,16 @@
 # Getting Started
 
+Migration status and remaining verification steps: [Migration Status](/guide/migration-status)
+
 ## Requirements
 
 - macOS or Linux
 - [tmux](https://github.com/tmux/tmux) with at least one session running `claude` or `codex`
+- Linux only: `zenity` for the image picker button
 
 ## Install
 
-### Homebrew (recommended)
+### macOS Homebrew
 
 ```bash
 brew install --cask yugo-ibuki/tap/unitmux
@@ -15,7 +18,8 @@ brew install --cask yugo-ibuki/tap/unitmux
 
 ### Manual
 
-Download the latest DMG from the [Releases](https://github.com/yugo-ibuki/unitmux/releases) page and drag the app to `/Applications`.
+- macOS: Download `unitmux-macos.dmg` from the [Releases](https://github.com/yugo-ibuki/unitmux/releases) page and drag the app to `/Applications`.
+- Linux: Download the `unitmux-linux` binary from the [Releases](https://github.com/yugo-ibuki/unitmux/releases) page, make it executable, and place it on your `PATH`.
 
 ### macOS Gatekeeper warning
 

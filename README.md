@@ -4,18 +4,21 @@ Unifies your AI coding sessions into a single floating interface.
 
 [日本語版はこちら](README.ja.md)
 
+Migration status: [RUST_MIGRATION_STATUS.md](RUST_MIGRATION_STATUS.md)
+
 ## What it does
 
 unitmux is a small always-on-top window that connects to all your AI coding assistants (`claude`, `codex`) running in tmux. Send commands, see status, and pick choices — all from one place, without switching terminals.
 
 ## Requirements
 
-- macOS
+- macOS or Linux
 - [tmux](https://github.com/tmux/tmux) with at least one session running `claude` or `codex`
+- Linux only: `zenity` for the image picker button
 
 ## Install
 
-### Homebrew (recommended)
+### macOS Homebrew
 
 ```bash
 brew install --cask yugo-ibuki/tap/unitmux
@@ -23,7 +26,8 @@ brew install --cask yugo-ibuki/tap/unitmux
 
 ### Manual
 
-Download the latest DMG from the [Releases](https://github.com/yugo-ibuki/unitmux/releases) page and drag the app to `/Applications`.
+- macOS: Download `unitmux-macos.dmg` from the [Releases](https://github.com/yugo-ibuki/unitmux/releases) page and drag the app to `/Applications`.
+- Linux: Download the `unitmux-linux` binary from the [Releases](https://github.com/yugo-ibuki/unitmux/releases) page, make it executable, and place it on your `PATH`.
 
 ### macOS Gatekeeper warning
 
@@ -74,7 +78,6 @@ When `claude` or `codex` presents numbered choices (e.g. "1. Yes / 2. No"), clic
 | `Ctrl+C`                    | Close session with confirmation (when detail panel is open)             |
 | `Ctrl+G`                    | Open git operations popup (key configurable)                            |
 | `Ctrl+F`                    | Open git diff viewer (key configurable)                                 |
-| `Ctrl+S`                    | Stop the running session — sends Escape to interrupt (key configurable) |
 | `Ctrl+W`                    | Toggle compact mode — shrinks window to tab bar only (key configurable) |
 | `Ctrl+N`                    | Create a new session (select target tmux session and command)           |
 | `/`                         | Open slash command autocomplete (when at start of input)                |
@@ -114,7 +117,6 @@ Click the gear icon to access settings:
 - **Choice Key** — change the modifier for quick choice shortcuts (`Ctrl` or `Cmd`)
 - **Send Key** — choose between `Cmd+Enter` or `Enter` to send (the other key inserts a newline)
 - **Vim Mode** — enable Escape+i insert mode switch for Claude CLI's vim editor mode
-- **Stop Key** — change the key for stopping a running session (`Ctrl+<key>`)
 - **Compact Key** — change the key for compact mode toggle (`Ctrl+<key>`)
 - **Preview Key** — change the key for pane content preview (`Ctrl+<key>`)
 - **Detail Key** — change the key for session detail popup (`Ctrl+<key>`)

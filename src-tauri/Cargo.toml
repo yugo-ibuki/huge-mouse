@@ -1,0 +1,12 @@
+[package]
+name = "unitmux"
+version = "0.7.0"
+edition = "2024"
+
+[build-dependencies]
+tauri-build = { version = "2.5.5", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2.10.2", features = [] }
+unitmux-core = { path = "../crates/unitmux-core" }

@@ -1,1 +1,128 @@
 /// <reference types="vite/client" />
+
+export {}
+
+interface SkillEntry {
+  name: string
+  description: string
+}
+
+interface TmuxChoice {
+  number: string
+  label: string
+}
+
+interface TmuxPane {
+  target: string
+  pid: string
+  command: string
+  title: string
+  status: 'idle' | 'busy' | 'waiting'
+  choices: TmuxChoice[]
+  prompt: string
+  activityLine: string
+}
+
+interface PaneDetail {
+  target: string
+  pid: string
+  command: string
+  title: string
+  width: string
+  height: string
+  startedAt: string
+  cwd: string
+  tty: string
+  gitBranch: string
+  gitStatus: string
+  model: string
+  sessionId: string
+}
+
+interface TokenUsageSlice {
+  input: number
+  cachedInput: number
+  output: number
+  reasoningOutput: number
+  total: number
+  cacheHitRate: number | null
+}
+
+interface TokenUsage extends TokenUsageSlice {
+  lastRequest?: TokenUsageSlice
+  updatedAt?: string
+  source: 'claude-jsonl' | 'codex-jsonl' | 'none'
+}
+
+interface TokenUsageSummary {
+  all: TokenUsage
+  claude: TokenUsage
+  codex: TokenUsage
+  updatedAt?: string
+}
+
+interface SendResult {
+  success: boolean
+  error?: string
+}
+
+interface TmuxAPI {
+  listSessions: () => Promise<TmuxPane[]>
+  listSkills: (cwd: string) => Promise<{ user: SkillEntry[]; project: SkillEntry[] }>
+  listTmuxSessions: () => Promise<string[]>
+  createSession: (
+    sessionName: string,
+    command: 'claude' | 'codex',
+    cwd?: string
+  ) => Promise<SendResult>
+  createNewSession: (
+    sessionName: string,
+    command: 'claude' | 'codex',
+    cwd?: string
+  ) => Promise<SendResult>
+  killPane: (target: string) => Promise<SendResult>
+  findShellPane: (session: string) => Promise<string | null>
+  ensureShellPane: (
+    session: string,
+    cwd: string
+  ) => Promise<{ success: boolean; target?: string; error?: string }>
+  sendInput: (
+    target: string,
+    text: string,
+    vimMode?: boolean,
+    images?: string[]
+  ) => Promise<SendResult>
+  capturePane: (target: string) => Promise<string>
+  getPaneDetail: (target: string) => Promise<PaneDetail | null>
+  getTokenUsage: (target: string) => Promise<TokenUsage>
+  getTokenUsageSummary: (force?: boolean) => Promise<TokenUsageSummary>
+  gitAdd: (cwd: string) => Promise<SendResult>
+  gitAddFiles: (cwd: string, files: string[]) => Promise<SendResult>
+  gitCommit: (cwd: string, message: string) => Promise<SendResult>
+  gitPush: (cwd: string) => Promise<SendResult>
+  gitDiff: (cwd: string, staged?: boolean) => Promise<string>
+  setAlwaysOnTop: (value: boolean) => Promise<boolean>
+  getAlwaysOnTop: () => Promise<boolean>
+  setOpacity: (value: number) => Promise<number>
+  getOpacity: () => Promise<number>
+  setFocusShortcut: (key: string) => Promise<boolean>
+  toggleCompact: () => Promise<boolean>
+  onCompactChanged: (callback: (compact: boolean) => void) => () => void
+  onFocusTextarea: (callback: () => void) => () => void
+  startStream: (target: string) => Promise<boolean>
+  stopStream: () => Promise<boolean>
+  onStreamData: (callback: (content: string) => void) => () => void
+  selectImages: () => Promise<string[]>
+  onImageDropped: (callback: (paths: string[]) => void) => () => void
+}
+
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: {
+      invoke?: <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>
+      transformCallback?: (callback: (event: unknown) => void, once?: boolean) => number
+      unregisterCallback?: (id: number) => void
+    }
+    api: TmuxAPI
+  }
+}

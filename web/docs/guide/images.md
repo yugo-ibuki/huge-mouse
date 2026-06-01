@@ -7,6 +7,7 @@ Send images to the selected AI pane directly from unitmux.
 ## Attaching Images
 
 **Button**: Click the "+" button in the footer to open a file picker. Select one or more image files.
+On Linux, the button uses `zenity`.
 
 **Drag & Drop**: Drag image files from Finder directly onto the unitmux window.
 

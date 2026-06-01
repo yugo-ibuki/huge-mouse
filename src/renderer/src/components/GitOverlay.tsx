@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useUiStore } from '../stores/uiStore'
 
 interface GitFile {
@@ -70,7 +70,8 @@ export function GitOverlay(): React.JSX.Element | null {
   const [cursor, setCursor] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  const files = gitPopup ? parseGitStatus(gitPopup.gitStatus) : []
+  const files = useMemo(() => (gitPopup ? parseGitStatus(gitPopup.gitStatus) : []), [gitPopup])
+  const selectedSize = selected.size
   const listRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to keep cursor visible
@@ -113,15 +114,15 @@ export function GitOverlay(): React.JSX.Element | null {
   }, [gitPopup, flashResult, refresh])
 
   const addSelected = useCallback(async () => {
-    if (!gitPopup || selected.size === 0) return
+    if (!gitPopup || selectedSize === 0) return
     const r = await window.api.gitAddFiles(gitPopup.cwd, Array.from(selected))
     flashResult(
-      r.success ? `Staged ${selected.size} file${selected.size > 1 ? 's' : ''}` : r.error ?? 'Failed',
+      r.success ? `Staged ${selectedSize} file${selectedSize > 1 ? 's' : ''}` : r.error ?? 'Failed',
       r.success
     )
     await refresh()
     setSelected(new Set())
-  }, [gitPopup, selected, flashResult, refresh])
+  }, [gitPopup, selected, selectedSize, flashResult, refresh])
 
   const toggleFile = useCallback(
     (path: string) => {
@@ -136,12 +137,12 @@ export function GitOverlay(): React.JSX.Element | null {
   )
 
   const toggleAll = useCallback(() => {
-    if (selected.size === files.length) {
+    if (selectedSize === files.length) {
       setSelected(new Set())
     } else {
       setSelected(new Set(files.map((f) => f.path)))
     }
-  }, [selected, files])
+  }, [selectedSize, files])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -182,7 +183,7 @@ export function GitOverlay(): React.JSX.Element | null {
           e.preventDefault()
           break
         case 'Enter':
-          if (selected.size > 0) addSelected()
+          if (selectedSize > 0) addSelected()
           e.preventDefault()
           break
         case 'p':
@@ -195,7 +196,18 @@ export function GitOverlay(): React.JSX.Element | null {
           break
       }
     },
-    [cursor, files, closePopup, toggleFile, toggleAll, addAll, addSelected, gitPopup, flashResult]
+    [
+      cursor,
+      files,
+      selectedSize,
+      closePopup,
+      toggleFile,
+      toggleAll,
+      addAll,
+      addSelected,
+      gitPopup,
+      flashResult
+    ]
   )
 
   if (gitPopup === null) return null

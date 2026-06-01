@@ -295,7 +295,7 @@ export function InputArea({ textareaRef }: InputAreaProps): React.JSX.Element {
 
   const attachedImages = useInputStore((s) => s.images)
 
-  // Listen for image drops intercepted by main process
+  // Listen for image drops forwarded by the desktop shell.
   useEffect(() => {
     return window.api.onImageDropped((paths) => {
       useInputStore.getState().addImages(paths)
